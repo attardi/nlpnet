@@ -10,6 +10,12 @@ Author: Erick Rocha Fonseca
 import logging
 import numpy as np
 
+# Attardi: allow executing from anywhere without installing package
+import sys
+import os
+srcdir = os.path.dirname(os.path.realpath(__file__)) + '/../'
+sys.path.append(srcdir + 'build/lib.linux-x86_64-2.7')
+
 import nlpnet.config as config
 import nlpnet.read_data as read_data
 import nlpnet.utils as utils
@@ -17,6 +23,7 @@ import nlpnet.taggers as taggers
 import nlpnet.metadata as metadata
 import nlpnet.srl as srl
 import nlpnet.pos as pos
+import nlpnet.ner as ner
 import nlpnet.arguments as arguments
 import nlpnet.reader as reader
 from nlpnet.network import Network, ConvolutionalNetwork, LanguageModel
@@ -33,7 +40,17 @@ def create_reader(args):
     logger.info("Reading text...")
     if args.task == 'pos':
         text_reader = pos.pos_reader.POSReader(filename=args.gold)
-    
+        text_reader.load_tag_dict() # shouldnt rather save it? Attardi
+
+    elif args.task == 'ner':
+        text_reader = ner.ner_reader.NerReader(filename=args.gold)
+        # create tag_dict
+        for sentence in text_reader.sentences:
+            for form, tag in sentence:
+                if tag not in text_reader.tag_dict:
+                    text_reader.tag_dict[tag] = len(text_reader.tag_dict)
+        text_reader.save_tag_dict()
+
     elif args.task == 'lm':
         text_reader = reader.TextReader(filename=args.gold)
 
@@ -53,10 +70,13 @@ def create_reader(args):
         elif not args.classify and not args.pred:
             # this is SRL as one step, we use IOB
             text_reader.convert_tags('iob')
+        
+        text_reader.load_tag_dict()
     
     else:
         raise ValueError("Unknown task: %s" % args.task)
     
+    text_reader.load_dictionary()
     return text_reader
     
 
@@ -66,7 +86,7 @@ def create_network(args, text_reader, feature_tables, md=None):
     
     if args.task.startswith('srl') and args.task != 'srl_predicates':
         num_tags = len(text_reader.tag_dict)
-        distance_tables = utils.set_distance_features(args.max_dist, args.target_features,
+        distance_tables = utils.set_distance_features(md, args.max_dist, args.target_features,
                                                       args.pred_features)
         nn = ConvolutionalNetwork.create_new(feature_tables, distance_tables[0], 
                                              distance_tables[1], args.window, 
@@ -91,6 +111,7 @@ def create_network(args, text_reader, feature_tables, md=None):
         padding_right = text_reader.converter.get_padding_right(tokens_as_string=True)
         
     else:
+        # pos, srl_predicates or ner
         num_tags = len(text_reader.tag_dict)
         nn = Network.create_new(feature_tables, args.window, args.hidden, num_tags)
         if args.learning_rate_transitions > 0:
@@ -98,8 +119,8 @@ def create_network(args, text_reader, feature_tables, md=None):
             nn.transitions = transitions
             nn.learning_rate_trans = args.learning_rate_transitions
 
-        padding_left = text_reader.converter.get_padding_left(args.task == 'pos')
-        padding_right = text_reader.converter.get_padding_right(args.task == 'pos')
+        padding_left = text_reader.converter.get_padding_left(args.task == 'pos' or args.task == 'ner')
+        padding_right = text_reader.converter.get_padding_right(args.task == 'pos' or args.task == 'ner')
     
     nn.padding_left = np.array(padding_left)
     nn.padding_right = np.array(padding_right)
@@ -125,15 +146,22 @@ def save_features(nn, md):
     :param nn: the neural network
     :param md: a Metadata object describing the network
     """
+    iter_tables = iter(nn.feature_tables)
     # type features
-    utils.save_features_to_file(nn.feature_tables[0], config.FILES[md.type_features])
+    utils.save_features_to_file(iter_tables.next(), config.FILES[md.type_features])
     
     # other features - the order is important!
-    iter_tables = iter(nn.feature_tables[1:])
     if md.use_caps: utils.save_features_to_file(iter_tables.next(), config.FILES[md.caps_features])
     if md.use_suffix: utils.save_features_to_file(iter_tables.next(), config.FILES[md.suffix_features])
     if md.use_pos: utils.save_features_to_file(iter_tables.next(), config.FILES[md.pos_features])
     if md.use_chunk: utils.save_features_to_file(iter_tables.next(), config.FILES[md.chunk_features])
+
+    # NER gazetteer features
+    if md.use_gazetteer:
+        utils.save_features_to_file(iter_tables.next(), config.FILES[md.gaz_loc_features])
+        utils.save_features_to_file(iter_tables.next(), config.FILES[md.gaz_misc_features])
+        utils.save_features_to_file(iter_tables.next(), config.FILES[md.gaz_org_features])
+        utils.save_features_to_file(iter_tables.next(), config.FILES[md.gaz_per_features])
     
 def load_network_train(args, md):
     """Loads and returns a neural network with all the necessary data."""
@@ -149,7 +177,7 @@ def load_network_train(args, md):
     
     return nn
 
-def train(reader, args):
+def train(text_reader, args):   # was reader. Attardi
     """Trains a neural network for the selected task."""
     intervals = max(args.iterations / 200, 1)
     np.seterr(over='raise')
@@ -183,10 +211,11 @@ if __name__ == '__main__':
     use_pos = args.pos is not None
     use_chunk = args.chunk is not None
     use_lemma = args.use_lemma
+    use_gazetteer = args.gazetteer
     
     if not args.load_network:
         # if we are about to create a new network, create the metadata too
-        md = metadata.Metadata(args.task, use_caps, use_suffix, use_pos, use_chunk, use_lemma)
+        md = metadata.Metadata(args.task, use_caps, use_suffix, use_pos, use_chunk, use_lemma, use_gazetteer)
         md.save_to_file()
     else:
         md = metadata.Metadata.load_from_file(args.task)

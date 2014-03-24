@@ -35,16 +35,16 @@ class POSReader(TaggerReader):
                         items = cleaned.split()
                         self.sentences.append([item.split('_') for item in items])
             
-
-    def get_inverse_tag_dictionary(self):
-        """
-        Returns a version of the tag dictionary useful for consulting
-        the meaning of the network's output.
-        """
-        tuples = [(x[1], x[0]) for x in self.tag_dict.iteritems()]
-        ret = dict(tuples)
+    # Attardi: inherited from TaggerReader
+    # def get_inverse_tag_dictionary(self):
+    #     """
+    #     Returns a version of the tag dictionary useful for consulting
+    #     the meaning of the network's output.
+    #     """
+    #     tuples = [(x[1], x[0]) for x in self.tag_dict.iteritems()]
+    #     ret = dict(tuples)
         
-        return ret
+    #     return ret
 
 # backwards compatibility
 MacMorphoReader = POSReader

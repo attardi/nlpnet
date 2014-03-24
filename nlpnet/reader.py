@@ -17,13 +17,14 @@ from attributes import get_capitalization
 
 class TextReader(object):
     
-    def __init__(self, sentences=None, filename=None):
+    def __init__(self, sentences=None, filename=None, variant=None):
         """
         :param sentences: A list of lists of tokens.
         :param filename: Alternatively, the name of the file from where sentences 
             can be read. The file should have one sentence per line, with tokens
             separated by white spaces.
         """
+        self.variant = variant
         if sentences is not None:
             self.sentences = sentences
         else:
@@ -65,7 +66,7 @@ class TextReader(object):
         logger = logging.getLogger("Logger")
         logger.info("Creating dictionary...")
         
-        self.word_dict = WordDictionary(self.sentences, dict_size, minimum_occurrences)
+        self.word_dict = WordDictionary(self.sentences, dict_size, minimum_occurrences, self.variant)
             
         logger.info("Done. Dictionary size is %d tokens" % self.word_dict.num_tokens)
     
@@ -127,6 +128,7 @@ class TaggerReader(TextReader):
             self.load_dictionary()
             self.load_tag_dict()
     
+    
     def generate_dictionary(self, dict_size=None, minimum_occurrences=None):
         """
         Generates a token dictionary based on the given sentences.
@@ -142,7 +144,7 @@ class TaggerReader(TextReader):
         self.word_dict = WordDictionary(tokens, dict_size, minimum_occurrences)
             
         logger.info("Done. Dictionary size is %d tokens" % self.word_dict.num_tokens)
-    
+
     def get_inverse_tag_dictionary(self):
         """
         Returns a version of the tag dictionary that maps numbers to tags.
@@ -202,7 +204,7 @@ class TaggerReader(TextReader):
         if filename is None:
             key = '%s_tag_dict' % self.task
             filename = config.FILES[key]
-        
+
         with open(filename, 'wb') as f:
             cPickle.dump(self.tag_dict, f)
     
@@ -216,6 +218,3 @@ class TaggerReader(TextReader):
             
         with open(filename, 'rb') as f:
             self.tag_dict = cPickle.load(f)
-    
-    
-    

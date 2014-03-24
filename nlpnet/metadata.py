@@ -17,13 +17,14 @@ class Metadata(object):
     parameter files.
     """
     
-    def __init__(self, task, use_caps=True, use_suffix=False, use_pos=False, use_chunk=False, use_lemma=False):
+    def __init__(self, task, use_caps=True, use_suffix=False, use_pos=False, use_chunk=False, use_lemma=False, use_gazetteer=False):
         self.task = task
         self.use_caps = use_caps
         self.use_suffix = use_suffix
         self.use_pos = use_pos
         self.use_chunk = use_chunk
         self.use_lemma = use_lemma
+        self.use_gazetteer = use_gazetteer
         self.metadata = 'metadata_%s' % task
         self.network = 'network_%s' % task
         
@@ -69,6 +70,13 @@ class Metadata(object):
             self.pos_features = 'pos_features_%s' % task
             self.chunk_features = 'chunk_features_%s' % task
             self.suffix_features = 'suffix_features_%s' % task
+
+        if task == 'ner':
+            self.gazetteer = 'gazetteer_ner' # gazetteer file
+            self.gaz_loc_features = 'gazl_features_ner'
+            self.gaz_misc_features = 'gazm_features_ner'
+            self.gaz_org_features = 'gazo_features_ner'
+            self.gaz_per_features = 'gazp_features_ner'
     
     def __str__(self):
         """Shows the task at hand and which attributes are used."""
@@ -115,7 +123,7 @@ if __name__ == '__main__':
     import argparse
     
     parser = argparse.ArgumentParser(description='This script will save a metadata file in the data directory.')
-    parser.add_argument('--task', choices=['srl', 'pos'], 
+    parser.add_argument('--task', choices=['srl', 'pos', 'ner'], 
                         help='Task for which the network should be used.', type=str)
     parser.add_argument('--pos', help='Use POS as a feature',
                         action='store_true')
@@ -123,6 +131,8 @@ if __name__ == '__main__':
                         action='store_true')
     parser.add_argument('--lemma', help='Use lemmas instead of the actual words',
                         action='store_true')
+    parser.add_argument('--use_gazetteer', help='Include gazetteer features (for NER only).',
+                        action='store_true')                        
     parser.add_argument('--caps', help='Use capitalization as a feature',
                         action='store_true')
     parser.add_argument('--suf', help='Use suffix features', action='store_true', dest='suffix')
@@ -141,7 +151,7 @@ if __name__ == '__main__':
     elif args.predicates:
         args.task = 'srl_predicates'
     
-    m = Metadata(args.task, args.caps, args.suffix, args.pos, args.chunk, args.lemma)
+    m = Metadata(args.task, args.caps, args.suffix, args.pos, args.chunk, args.lemma, args.gazetteer)
     m.save_to_file()
     
     

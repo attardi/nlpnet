@@ -7,8 +7,8 @@ These arguments used by the training script.
 
 import argparse
 
-# Tasks performed: part-of-speech tagging and semantic role labeling
-TASKS = set(['pos', 'srl', 'lm'])
+# Tasks performed: part-of-speech tagging, semantic role labeling, language modeling and NER
+TASKS = set(['pos', 'srl', 'lm', 'ner'])
 
 def get_args():
     parser = argparse.ArgumentParser(description="Trains a neural\
@@ -27,7 +27,7 @@ def get_args():
     parser.add_argument('-e', '--epochs', type=int,
                         help='Number of training epochs',
                         default=100, dest='iterations')
-    parser.add_argument('-l', '--learning_rate', type=float,
+    parser.add_argument('-l', '--learning_rate', type=float, default=0.01,
                         help='Learning rate for network connections',
                         dest='learning_rate')
     parser.add_argument('--lf', type=float, default=0,
@@ -46,6 +46,8 @@ def get_args():
                         help='Include chunk features (for SRL only). Optionally, supply the number of features (default 5)')
     parser.add_argument('--use_lemma', action='store_true',
                         help='Use word lemmas instead of surface forms.', dest='use_lemma')
+    parser.add_argument('--gazetteer', const=5, nargs='?', type=int, default=None,
+                        help='Include gazetteer features (for NER only). Optionally, supply the number of features (default 5)')
     parser.add_argument('-a', '--accuracy', type=float,
                         help='Desired accuracy per tag.',
                         default=0, dest='accuracy')
@@ -77,6 +79,7 @@ def get_args():
                         type=str, default='')
     parser.add_argument('--gold', help='File with annotated data for training.', type=str, default=None)
     parser.add_argument('--data', help='Directory to save new models and load partially trained ones', type=str, default=None, required=True)
+    parser.add_argument('--variant', help='If "polyglot" use Polyglot case conventions', type=str, default=None)
     
     args = parser.parse_args()
     

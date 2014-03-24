@@ -16,7 +16,6 @@ class Caps(object):
     non_alpha = 2
     other = 3
 
-
 class Token(object):
     def __init__(self, word, lemma='NA', pos='NA', morph='NA', chunk='NA'):
         """
@@ -34,16 +33,14 @@ class Token(object):
     
     def __repr__(self):
         return self.word.__repr__()
-
-
+    
 class Suffix(object):
     """Dummy class for manipulating suffixes and their related codes."""
     codes = {}
-    suffixes_by_size = []
-    other = 0
-    
-    # initially, there is only the "other" (rare) suffix
-    num_suffixes = 1
+    # words smaller than the suffix size
+    small_word = 0
+    other = 1
+    num_suffixes = 2
     
     @classmethod
     def load_suffixes(cls):
@@ -59,32 +56,44 @@ class Suffix(object):
                     suffix = unicode(line.strip(), 'utf-8')
                     Suffix.codes[suffix] = code
                     code += 1
+            Suffix.suffix_size = len(suffix)
+            Suffix.num_suffixes = code 
         except IOError:
             logger.warning('Suffix list doesn\'t exist.')
             raise
+    
+    @classmethod
+    def create_suffix_list(cls, wordlist, num, size, min_occurrences):
+        """
+        Creates a file containing the list of the most common suffixes found in 
+        wordlist.
         
-        Suffix.num_suffixes = code
-        Suffix.suffixes_by_size = sorted(Suffix.codes,
-                                         key=len,
-                                         reverse=True)
-    
-    
+        :param wordlist: a list of word types (there shouldn't be repetitions)
+        :param num: maximum number of suffixes
+        :param size: desired size of suffixes
+        :param min_occurrences: minimum number of occurrences of each suffix
+        in wordlist
+        """
+        all_endings = [x[-size:] for x in wordlist 
+                       if len(x) > size
+                       and not re.search('_|\d', x[-size:])]
+        c = Counter(all_endings)
+        common_endings = c.most_common(num)
+        suffix_list = [e for e, n in common_endings if n >= min_occurrences]
+        
+        with open(config.FILES['suffixes'], 'wb') as f:
+            for suffix in suffix_list:
+                f.write('%s\n' % suffix.encode('utf-8'))
+
     @classmethod
     def get_suffix(cls, word):
         """
         Returns the suffix code for the given word.
-        
-        This implementation is not the most efficient (it checks every 
-        suffix separately, instead of using a tree structure), but 
-        it is intended to be called only once per word.
         """
-        # check longer suffixes first
-        for suffix in Suffix.suffixes_by_size:
-            if word.endswith(suffix) and len(word) > len(suffix):
-                return Suffix.codes[suffix]
+        if len(word) < Suffix.suffix_size: return Suffix.small_word
         
-        return Suffix.other
-
+        suffix = word[-Suffix.suffix_size:]
+        return Suffix.codes.get(suffix.lower(), Suffix.other)
 
 class TokenConverter(object):
     
@@ -169,4 +178,8 @@ def capitalize(word, capitalization):
         return word.upper()
     else:
         raise ValueError("Unknown capitalization type.")
+
+# Gazetteer feature is binary (0, 1)
+num_gazetteer_tags = 2
+
 

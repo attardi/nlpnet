@@ -68,7 +68,7 @@ def read_plain_srl(filename):
                 token_num = 0
                 continue
             
-            parts = line.split()
+            parts = line.split('\t') # was (), Attardi
             token = Token(parts[0].strip())
             sentence.append(token)
             
@@ -91,7 +91,7 @@ def read_plain_srl(filename):
         sentences.append((sentence, tags, predicates))
     
     return sentences
-    
+
 
 def verify_chunk_tag(new_tag, expected_tag):
     """

@@ -37,7 +37,18 @@ def set_data_dir(directory):
          'type_features_pos': os.path.join(data_dir, 'types-features-pos.npy'),
          'caps_features_pos': os.path.join(data_dir, 'caps-features-pos.npy'),
          'suffix_features_pos': os.path.join(data_dir, 'suffix-features-pos.npy'),
-         
+
+         # NER
+         'network_ner': os.path.join(data_dir, 'ner-network.npz'),
+         'ner_tag_dict': os.path.join(data_dir, 'ner-tag-dict.pickle'),
+         'type_features_ner': os.path.join(data_dir, 'types-features-ner.npy'),
+         'caps_features_ner': os.path.join(data_dir, 'caps-features-ner.npy'),
+         'gazetteer_ner': os.path.join(data_dir, 'eng.list'),
+         'gazl_features_ner': os.path.join(data_dir, 'gazl-features-ner.npy'),
+         'gazm_features_ner': os.path.join(data_dir, 'gazm-features-ner.npy'),
+         'gazo_features_ner': os.path.join(data_dir, 'gazo-features-ner.npy'),
+         'gazp_features_ner': os.path.join(data_dir, 'gazp-features-ner.npy'),
+
          # chunk
          'chunk_tag_dict': os.path.join(data_dir, 'chunk-tag-dict.pickle'),
     

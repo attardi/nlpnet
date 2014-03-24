@@ -305,6 +305,7 @@ Output size: %d
             return False
         
         # initialize gradients
+        # ((len(sentence), self.output_size)) // Attardi
         self.net_gradients = np.zeros_like(scores, np.float)
         self.trans_gradients = np.zeros_like(self.transitions, np.float)
         
@@ -457,13 +458,12 @@ Output size: %d
         epoch, including error and accuracy.
         """
         cdef float error = self.error / self.total_items
-        print "%d epochs   Error: %f   Accuracy: %f   " \
-            "%d corrections could be skipped   " \
-            "%d floating point errors" % (num,
-                                          error,
-                                          self.accuracy,
-                                          self.skips,
-                                          self.float_errors)
+        print "%d epochs   Error: %f   Accuracy: %f   %d corrections could be skipped   %d floating point errors" % \
+        (num,
+         error,
+         self.accuracy,
+         self.skips,
+         self.float_errors)
     
     def _train_epoch(self, list sentences, list tags):
         """
@@ -495,6 +495,7 @@ Output size: %d
         """Backpropagate the error gradient."""
         # find the hidden gradients by backpropagating the output
         # gradients and multiplying the derivative
+        # ((len(sentence), output_size)) x (output_size, hidden_size) = (len, hidden_size) Attardi
         cdef np.ndarray[FLOAT_t, ndim=2] hidden_gradients = self.net_gradients.dot(self.output_weights)
         
         # the derivative of tanh(x) is 1 - tanh^2(x)
@@ -504,6 +505,7 @@ Output size: %d
         # backpropagate to input layer (in order to adjust features)
         # since no function is applied to the feature values, no derivative is needed
         # (or you can see it as f(x) = x --> f'(x) = 1)
+        # ((len(sentence), hidden_size) x (hidden_size, input_size) = (len, input_size) Attardi
         cdef np.ndarray[FLOAT_t, ndim=2] input_gradients = hidden_gradients.dot(self.hidden_weights)
         
         """

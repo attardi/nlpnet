@@ -298,6 +298,24 @@ def load_features(args, md, text_reader):
             chunk_table = generate_feature_vectors(num_chunk_tags, args.chunk)
         
         feature_tables.append(chunk_table)
+
+    # gazetteer tags
+    if md.use_gazetteer:
+        if args.load_network:
+            logger.info("Loading gazetteer features...")
+            table = load_features_from_file(config.FILES[md.gaz_loc_features])
+            feature_tables.append(table)
+            table = load_features_from_file(config.FILES[md.gaz_misc_features])
+            feature_tables.append(table)
+            table = load_features_from_file(config.FILES[md.gaz_org_features])
+            feature_tables.append(table)
+            table = load_features_from_file(config.FILES[md.gaz_per_features])
+            feature_tables.append(table)
+        else:
+            logger.info("Generating gazetteer features...")
+            for i in range(4):  # 4 classes [LOC, MISC, ORG, PER]
+                table = generate_feature_vectors(attributes.num_gazetteer_tags, args.gazetteer)
+                feature_tables.append(table)
     
     return feature_tables
 

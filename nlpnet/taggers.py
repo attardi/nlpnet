@@ -14,6 +14,7 @@ import attributes
 from metadata import Metadata
 from pos.pos_reader import POSReader
 from srl.srl_reader import SRLReader
+from ner.ner_reader import NerReader, NerTagReader
 from network import Network, ConvolutionalNetwork, LanguageModel
 
 def load_network(md):
@@ -48,14 +49,24 @@ def load_network(md):
     if md.use_chunk:
         chunk_features = utils.load_features_from_file(config.FILES[md.chunk_features])
         tables.append(chunk_features)
-        
+    # NER gazetteers
+    if md.use_gazetteer:
+        features = utils.load_features_from_file(config.FILES[md.gaz_loc_features])
+        tables.append(features)
+        features = utils.load_features_from_file(config.FILES[md.gaz_misc_features])
+        tables.append(features)
+        features = utils.load_features_from_file(config.FILES[md.gaz_org_features])
+        tables.append(features)
+        features = utils.load_features_from_file(config.FILES[md.gaz_per_features])
+        tables.append(features)
+
     nn.feature_tables = tables
     
     logger.info('Done')
     return nn
 
 
-def create_reader(md, gold_file=None):
+def create_reader(md, gold_file=None, tagging=False):
     """
     Creates a TextReader object for the given task and loads its dictionary.
     """
@@ -64,7 +75,16 @@ def create_reader(md, gold_file=None):
     
     if md.task == 'pos':
         tr = POSReader(filename=gold_file)
-        
+        tr.load_tag_dict()
+
+    elif md.task == 'ner':
+        if tagging:
+            tr = NerTagReader()
+        else:
+            print 'loading dict'
+            tr = NerReader(filename=gold_file)
+        tr.load_tag_dict()
+
     elif md.task.startswith('srl'):
         tr = SRLReader(filename=gold_file, only_boundaries= (md.task == 'srl_boundary'),
                        only_classify= (md.task == 'srl_classify'), 
@@ -266,7 +286,7 @@ class POSTagger(Tagger):
         Tags the given text.
         
         :param text: a string or unicode object. Strings assumed to be utf-8
-        :returns: a list of lists (sentences with tokens). 
+        :returns: a list of lists (sentences with tokens).
             Each sentence has (token, tag) tuples.
         """
         tokens = utils.tokenize(text, clean=False)
@@ -293,5 +313,48 @@ class POSTagger(Tagger):
                                      for token in tokens])
         answer = self.nn.tag_sentence(converted_tokens)
         tags = [self.itd[tag] for tag in answer]
+        return tags
+
+class NERTagger(Tagger):
+    """A NERTagger loads the models and performs NER tagging on text."""
+    
+    def _load_data(self):
+        """Loads data for NER"""
+        md = Metadata.load_from_file('ner')
+        self.nn = load_network(md)
+        self.reader = create_reader(md, tagging=True)
+        self.itd = self.reader.get_inverse_tag_dictionary()
+    
+    def tag(self):
+        """
+        Tags the text read.
+        
+        :returns: a list of lists (sentences with tokens). Each sentence has (token, tag) tuples.
+        """
+        result = []
+        for sent in self.reader.sentences:
+            tags = self.tag_tokens(sent)
+            result.append(zip(sent, tags))
+        
+        return result
+    
+    def tag_tokens(self, tokens):
+        """
+        Tags a given list of tokens. 
+        
+        Tokens should be produced with the nlpnet tokenizer in order to 
+        match the entries in the vocabulary. If you have non-tokenized text,
+        use NERTagger.tag(text).
+        
+        :param tokens: a list of strings
+        :returns: a list of strings (the tags)
+        """
+        converter = self.reader.converter
+        # FIXME: we discard POS
+        converted_tokens = np.array([converter.convert(token[0]) 
+                                     for token in tokens])
+        answer = self.nn.tag_sentence(converted_tokens)
+        tags = [self.itd[tag] for tag in answer]
+        tags = self.reader.toIOB(tags)
         return tags
 

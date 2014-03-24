@@ -5,8 +5,10 @@ A neural network for the language modeling task, aimed
 primiraly at inducing word representations.
 """
 
-import numpy as np
-cimport numpy as np
+# import numpy as np
+# cimport numpy as np
+
+import utils
 
 cdef class LanguageModel: 
     
@@ -34,7 +36,9 @@ cdef class LanguageModel:
     # pool of random numbers (used for efficiency)
     cdef np.ndarray random_pool
     cdef int next_random
-    
+
+    # file where to save model (Attardi)
+    cdef public char* filename
     
     @classmethod
     def create_new(cls, feature_tables, int word_window, int hidden_size):
@@ -78,6 +82,7 @@ cdef class LanguageModel:
         self.hidden_bias = hidden_bias
         self.output_weights = output_weights
         self.output_bias = output_bias
+        self.filename = ''      # Attardi
     
     def run(self, np.ndarray indices):
         """
@@ -257,7 +262,9 @@ cdef class LanguageModel:
                 self.error = 0
                 self.skips = 0
                 self.total_items = 0
-    
+            # save language model. Attardi
+            if batch and batch % 100 == 0:
+                utils.save_features_to_file(self.feature_tables[0], self.filename)
     
     def _extract_window(self, sentence, position):
         """
@@ -344,23 +351,7 @@ Hidden layer size: %d
         """
         cdef float error = self.error / self.total_items
         print "%d batches   Error:   %f   %d out of %d corrections could be skipped" % (num + 1,
-                                                                                        error,
-                                                                                        self.skips,
-                                                                                        self.total_items)
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+         error,
+         self.skips,
+         self.total_items)
+
