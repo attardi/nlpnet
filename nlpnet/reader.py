@@ -13,7 +13,7 @@ from collections import Counter
 import config
 import attributes
 from word_dictionary import WordDictionary
-from attributes import get_capitalization
+from attributes import get_capitalizations
 
 class TextReader(object):
     
@@ -94,7 +94,7 @@ class TextReader(object):
         """
         new_sentences = []
         for sent in self.sentences:
-            new_sent = np.array([self.converter.convert(token) for token in sent])
+            new_sent = self.converter.convert_sentence(sent)
             new_sentences.append(new_sent)
         
         self.sentences = new_sentences
@@ -105,12 +105,12 @@ class TextReader(object):
         feature vector indices
         """
         self.converter = attributes.TokenConverter()
-        self.converter.add_extractor(self.word_dict.get)
+        self.converter.add_extractor(self.word_dict.get_indices)
         if metadata.use_caps:
-            self.converter.add_extractor(get_capitalization)
+            self.converter.add_extractor(get_capitalizations)
         if metadata.use_suffix:
             attributes.Suffix.load_suffixes()
-            self.converter.add_extractor(attributes.Suffix.get_suffix)
+            self.converter.add_extractor(attributes.Suffix.get_suffixes)
     
 
 class TaggerReader(TextReader):
@@ -165,15 +165,11 @@ class TaggerReader(TextReader):
         rare_tag_value = self.tag_dict.get(self.rare_tag)
         
         for sent in self.sentences:
-            new_sent = []
             sentence_tags = []
             
-            for token, tag in sent:
-                new_token = self.converter.convert(token)
-                new_sent.append(new_token)
-                sentence_tags.append(self.tag_dict.get(tag, rare_tag_value))
-            
-            new_sentences.append(np.array(new_sent))
+            new_sent = self.converter.convert([token for token, tag in sent])
+            sentence_tags = [self.tag_dict.get(tag, rare_tag_value) for token, tag in sent]
+            new_sentences.append(new_sent)
             self.tags.append(np.array(sentence_tags))
         
         self.sentences = new_sentences

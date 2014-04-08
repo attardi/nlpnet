@@ -83,7 +83,7 @@ def create_reader(args):
 def create_network(args, text_reader, feature_tables, md=None):
     """Creates and returns the neural network according to the task at hand."""
     logger = logging.getLogger("Logger")
-    
+
     if args.task.startswith('srl') and args.task != 'srl_predicates':
         num_tags = len(text_reader.tag_dict)
         distance_tables = utils.set_distance_features(md, args.max_dist, args.target_features,
@@ -193,7 +193,12 @@ def train(text_reader, args):   # was reader. Attardi
         nn.train(text_reader.sentences, text_reader.tags, 
                  args.iterations, intervals, args.accuracy)
 
-
+def saver(nn_file, md):
+    """Function to save model periodically"""
+    def save(nn):
+        save_features(nn, md)
+        nn.save(nn_file)
+    return save
 
 if __name__ == '__main__':
     args = arguments.get_args()
@@ -234,12 +239,14 @@ if __name__ == '__main__':
     
     logger.info("Starting training with %d sentences" % len(text_reader.sentences))
     
+    nn_file = config.FILES[md.network]
+    nn.saver = saver(nn_file, md)
+
     train(text_reader, args)
     
     logger.info("Saving trained models...")
     save_features(nn, md)
     
-    nn_file = config.FILES[md.network]
     nn.save(nn_file)
     logger.info("Saved network to %s" % nn_file)
     

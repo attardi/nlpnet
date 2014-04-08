@@ -43,6 +43,7 @@ def set_data_dir(directory):
          'ner_tag_dict': os.path.join(data_dir, 'ner-tag-dict.pickle'),
          'type_features_ner': os.path.join(data_dir, 'types-features-ner.npy'),
          'caps_features_ner': os.path.join(data_dir, 'caps-features-ner.npy'),
+         'suffix_features_ner': os.path.join(data_dir, 'suffix-features-ner.npy'),
          'gazetteer_ner': os.path.join(data_dir, 'eng.list'),
          'gazl_features_ner': os.path.join(data_dir, 'gazl-features-ner.npy'),
          'gazm_features_ner': os.path.join(data_dir, 'gazm-features-ner.npy'),

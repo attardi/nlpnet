@@ -134,15 +134,15 @@ class SRLReader(TaggerReader):
         
         if metadata.use_lemma:
             # look up word lemmas 
-            word_lookup = lambda t: self.word_dict.get(t.lemma)
+            word_lookup = lambda tokens: [self.word_dict.get(t.lemma) for t in tokens]
         else:
             # look up the word itself
-            word_lookup = lambda t: self.word_dict.get(t.word)
+            word_lookup = lambda tokens: [self.word_dict.get(t.word) for t in tokens]
              
         self.converter.add_extractor(word_lookup)
         
         if metadata.use_caps:
-            caps_lookup = lambda t: attributes.get_capitalization(t.word)
+            caps_lookup = lambda tokens: [attributes.get_capitalization(t.word) for t in tokens]
             self.converter.add_extractor(caps_lookup)
         
         if metadata.use_pos:
@@ -151,7 +151,7 @@ class SRLReader(TaggerReader):
                 
             pos_def_dict = defaultdict(lambda: pos_dict['other'])
             pos_def_dict.update(pos_dict)
-            pos_lookup = lambda t: pos_def_dict[t.pos]
+            pos_lookup = lambda tokens: [pos_def_dict[t.pos] for t in tokens]
             self.converter.add_extractor(pos_lookup)
         
         if metadata.use_chunk:
@@ -160,7 +160,7 @@ class SRLReader(TaggerReader):
             
             chunk_def_dict = defaultdict(lambda: chunk_dict['O'])
             chunk_def_dict.update(chunk_dict)
-            chunk_lookup = lambda t: chunk_def_dict[t.chunk]
+            chunk_lookup = lambda tokens: [chunk_def_dict[t.chunk] for t in tokens]
             self.converter.add_extractor(chunk_lookup)
     
     def generate_tag_dict(self):

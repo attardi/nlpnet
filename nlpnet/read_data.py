@@ -68,7 +68,7 @@ def read_plain_srl(filename):
                 token_num = 0
                 continue
             
-            parts = line.split('\t') # was (), Attardi
+            parts = line.split('\t') # was split(), Attardi
             token = Token(parts[0].strip())
             sentence.append(token)
             

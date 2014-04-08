@@ -7,6 +7,7 @@ Taggers wrapping the neural networks.
 import logging
 import numpy as np
 from itertools import izip
+import sys
 
 import utils
 import config
@@ -213,8 +214,7 @@ class SRLTagger(Tagger):
         :param tokens: a list of attribute.Token elements
         :returns: the indices of predicate tokens
         """
-        sent_codified = np.array([self.pred_reader.converter.convert(token) 
-                                  for token in tokens])
+        sent_codified = self.pred_reader.converter.convert(tokens) 
         answer = np.array(self.pred_nn.tag_sentence(sent_codified))
         return answer.nonzero()[0]
 
@@ -245,10 +245,8 @@ class SRLTagger(Tagger):
             mapping argument labels to the words it includes.
         """
         tokens_obj = [attributes.Token(utils.clean_text(t, False)) for t in tokens]
-        converted_bound = np.array([self.boundary_reader.converter.convert(t) 
-                                    for t in tokens_obj])
-        converted_class = np.array([self.classify_reader.converter.convert(t) 
-                                    for t in tokens_obj])
+        converted_bound = self.boundary_reader.converter.convert(tokens_obj)
+        converted_class = self.classify_reader.converter.convert(tokens_obj)
         
         pred_positions = self.find_predicates(tokens_obj)
         
@@ -281,7 +279,7 @@ class POSTagger(Tagger):
         self.reader = create_reader(md)
         self.itd = self.reader.get_inverse_tag_dictionary()
     
-    def tag(self, text):
+    def tag(self, text=None):
         """
         Tags the given text.
         
@@ -289,12 +287,24 @@ class POSTagger(Tagger):
         :returns: a list of lists (sentences with tokens).
             Each sentence has (token, tag) tuples.
         """
-        tokens = utils.tokenize(text, clean=False)
         result = []
-        for sent in tokens:
-            tags = self.tag_tokens(sent)
-            result.append(zip(sent, tags))
-        
+        if text:
+            tokens = utils.tokenize(text, clean=False)
+            for sent in tokens:
+                tags = self.tag_tokens(sent)
+                result.append(zip(sent, tags))
+        else:
+            # read tsv from stdin
+            sent = []
+            for line in sys.stdin:
+                line = line.decode('utf-8').strip()
+                if line:
+                    sent.append(line.split()[0])
+                else:
+                    tags = self.tag_tokens(sent)
+                    result.append(zip(sent, tags))
+                    sent = []
+
         return result
     
     def tag_tokens(self, tokens):
@@ -309,8 +319,9 @@ class POSTagger(Tagger):
         :returns: a list of strings (the tags)
         """
         converter = self.reader.converter
-        converted_tokens = np.array([converter.convert(utils.clean_text(token, False)) 
-                                     for token in tokens])
+        # do not use clean_text. Attardi
+        #converted_tokens = np.array([converter.convert(utils.clean_text(token, False)) 
+        converted_tokens = converter.convert(tokens)
         answer = self.nn.tag_sentence(converted_tokens)
         tags = [self.itd[tag] for tag in answer]
         return tags
@@ -351,8 +362,7 @@ class NERTagger(Tagger):
         """
         converter = self.reader.converter
         # FIXME: we discard POS
-        converted_tokens = np.array([converter.convert(token[0]) 
-                                     for token in tokens])
+        converted_tokens = converter.convert([token[0] for token in tokens])
         answer = self.nn.tag_sentence(converted_tokens)
         tags = [self.itd[tag] for tag in answer]
         tags = self.reader.toIOB(tags)

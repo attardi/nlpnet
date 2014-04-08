@@ -1,0 +1,8 @@
+2014-03-10  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* bin/nlpnet-tag.py (_print_tagged_ner): handle ner output.
+
+	* bin/nlpnet-train.py (create_reader): added case for ner.
+	(create_network): similarly
+	(train): first argument is text_reader, not reader
+

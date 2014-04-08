@@ -1,0 +1,26 @@
+2014-04-07  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* attributes.py (TokenConverter.convert_sentence): aded to deal
+	with context in conversion.
+
+	* reader.py (TextReader.codify_sentences): use convert(sent).
+
+	* taggers.py (POSTagger.tag_tokens): drop use of clean_text.
+
+	* config.py (set_data_dir): added NER files.
+
+	* attributes.py (get_capitalization): added upper.
+
+2014-03-10  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* taggers.py (NERTagger): added.
+
+	* ner/ner_reader.py (NerReader): added.
+
+	* pos/pos_reader.py (POSReader.get_inverse_tag_dictionary):
+	removed: it is inherited from TaggerReader
+
+2013-12-15  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* networklm.pyx (train): save language model at every 100th batch.
+

@@ -23,12 +23,28 @@ def toIOBES(sent):
                 tok[1] = 'E'+tok[1][1:]
     return sent
 
+def create_extractor(dict):
+    def present(words):
+        # check presence in dictionary possibly as multiword
+        # set to 1 items corresponding to words present in dictionary
+        res = [0] * len(words)
+        for i, token in enumerate(words):
+            entity = token.lower()
+            if entity in dict:
+                res[i] = 1
+            for j in range(i+1, len(words)):
+                entity += ' ' + words[j].lower()
+                if entity in dict:
+                    for k in range(i, j+1):
+                        res[k] = 1
+        return res
+    return present
+
 def gazetteer(file):
     """:return a map of feature extractors form dictionary file, one for each class type.
     A dictionary file consists of lines:
     TYPE WORD
     """
-    dict = set()
     classes = {}
     for line in open(file):
         line = line.strip().decode('utf-8')
@@ -39,11 +55,8 @@ def gazetteer(file):
         classes[c].add(word)
 
     extractors = {}
-    for c in classes:
-        dict = classes[c]
-        def present(token):
-            return token in dict
-        extractors[c] = present
+    for c,dict in classes.iteritems():
+        extractors[c] = create_extractor(dict)
 
     return extractors
 

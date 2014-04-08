@@ -10,11 +10,12 @@ from word_dictionary import WordDictionary as WD
 
 class Caps(object):
     """Dummy class for storing numeric values for capitalization."""
-    num_values = 4
     lower = 0
     title = 1
     non_alpha = 2
     other = 3
+    upper = 4                   # Attardi
+    num_values = 5
 
 class Token(object):
     def __init__(self, word, lemma='NA', pos='NA', morph='NA', chunk='NA'):
@@ -42,6 +43,9 @@ class Suffix(object):
     other = 1
     num_suffixes = 2
     
+    # Attardi: fixed setting (mimic SENNA)
+    suffix_size = 2
+
     @classmethod
     def load_suffixes(cls):
         """
@@ -56,7 +60,7 @@ class Suffix(object):
                     suffix = unicode(line.strip(), 'utf-8')
                     Suffix.codes[suffix] = code
                     code += 1
-            Suffix.suffix_size = len(suffix)
+            #Suffix.suffix_size = len(suffix)
             Suffix.num_suffixes = code 
         except IOError:
             logger.warning('Suffix list doesn\'t exist.')
@@ -90,10 +94,22 @@ class Suffix(object):
         """
         Returns the suffix code for the given word.
         """
-        if len(word) < Suffix.suffix_size: return Suffix.small_word
+        # if len(word) < Suffix.suffix_size: return Suffix.small_word
         
-        suffix = word[-Suffix.suffix_size:]
+        # suffix = word[-Suffix.suffix_size:]
+
+        # Attardi: mimic SENNA
+        l = min(Suffix.suffix_size, len(word))
+        suffix = word[-l:]
+
         return Suffix.codes.get(suffix.lower(), Suffix.other)
+
+    @classmethod
+    def get_suffixes(cls, words):
+        """
+        :return: the list of suffix codes for the given words.
+        """
+        return map(Suffix.get_suffix, words)
 
 class TokenConverter(object):
     
@@ -123,7 +139,7 @@ class TokenConverter(object):
             pad = WD.padding_left
         else:
             pad = Token(WD.padding_left)
-        return self.convert(pad)
+        return self.convert([pad])[0]
     
     def get_padding_right(self, tokens_as_string=True):
         """
@@ -136,20 +152,20 @@ class TokenConverter(object):
             pad = WD.padding_right
         else:
             pad = Token(WD.padding_right)
-        return self.convert(pad)
+        return self.convert([pad])[0]
     
-    def convert(self, token):
+    def convert(self, sent):
         """
-        Converts a token into its feature indices.
+        Converts a sentence into a 2-d array of feature indices.
         """
-        indices = np.array([function(token) for function in self.extractors])
+        indices = np.array(zip(*[function(sent) for function in self.extractors]))
         return indices
 
 # capitalization
 def get_capitalization(word):
     """
     Returns a code describing the capitalization of the word:
-    lower, title, other or non-alpha (numbers and other tokens that can't be
+    lower, title, upper, other or non-alpha (numbers and other tokens that can't be
     capitalized).
     """
     if not word.isalpha():
@@ -160,8 +176,18 @@ def get_capitalization(word):
     
     if word.islower():
         return Caps.lower
+
+    if word.isupper():          # Attardi
+        return Caps.upper
     
     return Caps.other
+
+# capitalization
+def get_capitalizations(words):
+    """
+    :return: the list of capitalization codes for the given list of words.
+    """
+    return map(get_capitalization, words)
 
 def capitalize(word, capitalization):
     """

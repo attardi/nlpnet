@@ -88,9 +88,15 @@ def _print_tagged(tagged_sents, task):
     
 def _print_tagged_pos(tagged_sents):
     """Prints one sentence per line as token_tag"""
+    # for sent in tagged_sents:
+    #     s = ' '.join('_'.join(item) for item in sent)
+    #     print s
+
+    # print in tsv
     for sent in tagged_sents:
-        s = ' '.join('_'.join(item) for item in sent)
-        print s
+        for token in sent:
+            print '\t'.join([item.encode('utf-8') for item in token])
+        print
 
 def _print_tagged_srl(tagged_sents):
     for sent in tagged_sents:

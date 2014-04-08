@@ -72,27 +72,28 @@ class WordDictionary(dict):
         
         # set all words in the dictionary
         for num, word in enumerate(words):
-            self[word] = num
+            self[word] = num    # keep case. Attardi
         
         # if the given words include the rare symbol, don't replace it
         if WordDictionary.rare in words:
             self.num_tokens = size - 1
             
             # using dict.get() instead of [] because we override the latter
-            key = WordDictionary.rare # no need to lower()
+            key = WordDictionary.rare # keep case. Attardi
             self.index_rare = super(WordDictionary, self).get(key)
         else:
             self.num_tokens = size
             self.index_rare = size
             self[WordDictionary.rare] = self.index_rare
         
-        if WordDictionary.padding_left in self:
-            self.index_padding_left = self[WordDictionary.padding_left]
+        if WordDictionary.padding_left in words:
+            # keep case: both padding and PADDING are present in SENNA
+            self.index_padding_left = super(WordDictionary, self).get(WordDictionary.padding_left)
         else:
             self.index_padding_left = self.num_tokens + 1
             self[WordDictionary.padding_left] = self.index_padding_left
-        if WordDictionary.padding_right in self:
-            self.index_padding_right = self[WordDictionary.padding_right]
+        if WordDictionary.padding_right in words:
+            self.index_padding_right = super(WordDictionary, self).get(WordDictionary.padding_right)
         else:
             self.index_padding_right = self.num_tokens + 2
             self[WordDictionary.padding_right] = self.index_padding_right
@@ -191,15 +192,16 @@ class WordDictionary(dict):
             key = key.lower()
         return super(WordDictionary, self).__contains__(key)
     
-    def __setitem__(self, key, value):
-        """
-        Overrides the [] write operator. It converts every key to lower case
-        before assignment (except when variant is 'polyglot').
-        """
-        if self.variant == 'polyglot':
-            super(WordDictionary, self).__setitem__(key, value)
-        else:
-            super(WordDictionary, self).__setitem__(key.lower(), value)
+    # Keep case: 'padding' and 'PADDING' must remain different. Attardi
+    # def __setitem__(self, key, value):
+    #     """
+    #     Overrides the [] write operator. It converts every key to lower case
+    #     before assignment (except when variant is 'polyglot').
+    #     """
+    #     if self.variant == 'polyglot':
+    #         super(WordDictionary, self).__setitem__(key, value)
+    #     else:
+    #         super(WordDictionary, self).__setitem__(key.lower(), value)
     
     def __getitem__(self, key):
         """
@@ -209,6 +211,10 @@ class WordDictionary(dict):
         1) when given a word without an entry, it returns the value for the *RARE* key.
         2) all entries are converted to lower case before verification (except when variant is 'polyglot').
         """
+        # deal with symbols in original case, e.g. PADDING, UNKNOWN. Attardi
+        idx = super(WordDictionary, self).get(key)
+        if idx:
+            return idx
         if self.variant == 'polyglot':
             pass
         elif self.variant == 'senna':
@@ -234,9 +240,22 @@ class WordDictionary(dict):
         Checks the internal structure of the dictionary and makes necessary adjustments, 
         such as updating num_tokens.
         """
-        self.index_padding_left = self[WordDictionary.padding_left]
-        self.index_padding_right = self[WordDictionary.padding_right]
-        self.index_rare = self[WordDictionary.rare]
+
+        # must repeat, since it is called in reader.load_dictionary()
+        # after reloading with pickle. Attardi
+        if self.variant == 'polyglot':
+            WordDictionary.padding_left = '<PAD>'
+            WordDictionary.padding_right = '<PAD>'
+            WordDictionary.rare = '<UNK>'
+        elif self.variant == 'senna':
+            WordDictionary.padding_left = 'PADDING'
+            WordDictionary.padding_right = 'PADDING'
+            WordDictionary.rare = 'UNKNOWN'
+
+        # Keep case for special tokens. Attardi
+        self.index_padding_left = super(WordDictionary, self).get(WordDictionary.padding_left)
+        self.index_padding_right = super(WordDictionary, self).get(WordDictionary.padding_right)
+        self.index_rare = super(WordDictionary, self).get(WordDictionary.rare)
         # Polyglot and Senna have single padding token
         if self.index_padding_left == self.index_padding_right:
             self.num_tokens = len(self) - 2

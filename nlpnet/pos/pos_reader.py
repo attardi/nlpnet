@@ -31,9 +31,15 @@ class POSReader(TaggerReader):
             if filename is not None:
                 with open(filename, 'rb') as f:
                     for line in f:
-                        cleaned = utils.clean_text(unicode(line, 'utf-8'), False)
-                        items = cleaned.split()
-                        self.sentences.append([item.split('_') for item in items])
+                        line = line.strip()
+                        # Attardi: don't do it on tags, since PTB uses ``
+                        #cleaned = utils.clean_text(unicode(line, 'utf-8'), False)
+                        cleaned = unicode(line, 'utf-8')
+                        #items = cleaned.split()
+                        #self.sentences.append([item.split('_') for item in items])
+                        # Attardi: '_' may appear in text
+                        items = cleaned.split(' ')
+                        self.sentences.append([item.split('\t') for item in items])
             
     # Attardi: inherited from TaggerReader
     # def get_inverse_tag_dictionary(self):

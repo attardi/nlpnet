@@ -1,0 +1,46 @@
+Training
+
+Sentences are converted to list of feature indices invoking TextReader.codify_sentences(), which in turn calls self.converter.convert(token).
+
+Tagging
+
+A sentence is a list of strings
+It is passed to a reader, e.g. a TagReader (subclass of TextReader)
+A Reader has a list of extractors, which get all called by method convert() on each token to obtain a list of feature indices:
+
+    def convert(self, token):
+        """
+        Converts a token into its feature indices.
+        """
+        indices = np.array([function(token) for function in self.extractors])
+        return indices
+
+e.g. a TextReader has (possibly) these extractors:
+
+  self.converter.add_extractor(self.word_dict.get) # index in vocabolary
+  self.converter.add_extractor(get_capitalization) # {lower:0, title:1, non_alpha:2, other:3}
+  self.converter.add_extractor(attributes.Suffix.get_suffix)
+
+
+For instance, the POStagger (nlpnet/taggers.py)
+
+    def tag_tokens(self, tokens):
+        converter = self.reader.converter
+        converted_tokens = np.array([converter.convert(token) 
+                                     for token in tokens])
+	# each token is [[feat 1 indices], [feat 2 indices] ...]
+        answer = self.nn.tag_sentence(converted_tokens)
+        tags = [self.itd[tag] for tag in answer]
+
+where tag_sentence() calls run(window indices), which creates the input data by:
+
+  input_data =
+    np.concatenate([table[index] 
+                     for token_indices in indices
+		        # [[feat 1 indices], [feat 2 indices] ...]
+                        for index, table in zip(token_indices, 
+                                                self.feature_tables)
+                   ])
+
+feature_tables for discrete features are generated randomly by generate_feature_vectors in utils.py.
+E.g. for Caps is a 4x5 table that maps each Caps feature to a 5-vector.
