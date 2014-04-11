@@ -1,3 +1,11 @@
+2014-04-10  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* attributes.py (Suffix.get_suffix): check for PADDING.
+	(get_capitalization): check for PADDING.
+
+	* word_dictionary.py (isNumber): use regexp.
+	(WordDictionary.__getitem__): replace digits with '0'
+
 2014-04-07  Giuseppe Attardi  <attardi@di.unipi.it>
 
 	* attributes.py (TokenConverter.convert_sentence): aded to deal

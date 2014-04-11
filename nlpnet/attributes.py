@@ -10,11 +10,19 @@ from word_dictionary import WordDictionary as WD
 
 class Caps(object):
     """Dummy class for storing numeric values for capitalization."""
-    lower = 0
-    title = 1
-    non_alpha = 2
-    other = 3
-    upper = 4                   # Attardi
+    # lower = 0
+    # title = 1
+    # non_alpha = 2
+    # other = 3
+    # upper = 4                   # Attardi
+    # num_values = 5
+
+    # SENNA
+    padding = 0
+    upper  = 1
+    hascap = 2
+    title  = 3
+    nocaps = 4
     num_values = 5
 
 class Token(object):
@@ -52,7 +60,8 @@ class Suffix(object):
         loads the listed suffixes from the suffix file.
         """
         Suffix.codes = {}
-        code = Suffix.other + 1
+        #code = Suffix.other + 1
+        code = 0 # SENNA dump
         logger = logging.getLogger("Logger")
         try:
             with open(config.FILES['suffixes'], 'rb') as f:
@@ -65,6 +74,7 @@ class Suffix(object):
         except IOError:
             logger.warning('Suffix list doesn\'t exist.')
             raise
+        Suffix.other = Suffix.codes.get('NOSUFFIX', code) # SENNA
     
     @classmethod
     def create_suffix_list(cls, wordlist, num, size, min_occurrences):
@@ -99,6 +109,9 @@ class Suffix(object):
         # suffix = word[-Suffix.suffix_size:]
 
         # Attardi: mimic SENNA
+        if word == WD.padding_left or word == WD.padding_left:
+            return Suffix.codes.get(WD.padding_left, Suffix.other)
+
         l = min(Suffix.suffix_size, len(word))
         suffix = word[-l:]
 
@@ -168,19 +181,36 @@ def get_capitalization(word):
     lower, title, upper, other or non-alpha (numbers and other tokens that can't be
     capitalized).
     """
-    if not word.isalpha():
-        return Caps.non_alpha
+    # if not word.isalpha():
+    #     return Caps.non_alpha
     
-    if word.istitle():
+    # if word.istitle():
+    #     return Caps.title
+    
+    # if word.islower():
+    #     return Caps.lower
+
+    # if word.isupper():          # Attardi
+    #     return Caps.upper
+    
+    # return Caps.other
+
+    # SENNA
+    if word == WD.padding_left or word == WD.padding_right:
+        return Caps.padding
+
+    if word.isupper():
+        return Caps.upper
+
+    if word[0].isupper():       # istitle() checks other letters too
         return Caps.title
     
-    if word.islower():
-        return Caps.lower
+    # can't use islower() because it accepts '3b'
+    for c in word:
+        if c.isupper():
+            return Caps.hascap
 
-    if word.isupper():          # Attardi
-        return Caps.upper
-    
-    return Caps.other
+    return Caps.nocaps
 
 # capitalization
 def get_capitalizations(words):

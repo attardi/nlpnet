@@ -3,12 +3,12 @@
 import itertools
 from collections import Counter
 
+import re
+
+num = re.compile('[+\-]?([0-9][,.]?)+$')
+
 def isNumber(key):
-    try:
-        float(key)
-        True
-    except ValueError:
-        return False
+    return num.match(key)
 
 
 class WordDictionary(dict):
@@ -180,6 +180,9 @@ class WordDictionary(dict):
         """
         Overrides the "in" operator. Case insensitive (except when variant is 'polyglot').
         """
+        # deal with symbols in original case, e.g. PADDING, UNKNOWN. Attardi
+        if super(WordDictionary, self).__contains__(key):
+            return True
         if self.variant == 'polyglot':
             pass
         elif self.variant == 'senna':
@@ -188,21 +191,13 @@ class WordDictionary(dict):
                 key = '0'
             else:
                 key = key.lower()
+                # replace all digits by '0'
+                re.sub('[0-9]', '0', key)
         else:
             key = key.lower()
         return super(WordDictionary, self).__contains__(key)
     
     # Keep case: 'padding' and 'PADDING' must remain different. Attardi
-    # def __setitem__(self, key, value):
-    #     """
-    #     Overrides the [] write operator. It converts every key to lower case
-    #     before assignment (except when variant is 'polyglot').
-    #     """
-    #     if self.variant == 'polyglot':
-    #         super(WordDictionary, self).__setitem__(key, value)
-    #     else:
-    #         super(WordDictionary, self).__setitem__(key.lower(), value)
-    
     def __getitem__(self, key):
         """
         Overrides the [] read operator. 
@@ -223,6 +218,8 @@ class WordDictionary(dict):
                 key = '0'
             else:
                 key = key.lower()
+                # replace all digits by '0'
+                re.sub('[0-9]', '0', key)
         else:
             key = key.lower()
         return super(WordDictionary, self).get(key, self.index_rare)

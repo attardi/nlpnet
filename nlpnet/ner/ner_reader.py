@@ -41,18 +41,19 @@ def create_extractor(dict):
     return present
 
 def gazetteer(file):
-    """:return a map of feature extractors form dictionary file, one for each class type.
+    """
+    :return a map of feature extractors form dictionary file, one for each class type.
     A dictionary file consists of lines:
-    TYPE WORD
+    TYPE WORD[ WORD]*
     """
     classes = {}
     for line in open(file):
         line = line.strip().decode('utf-8')
-        c, word = line.split(None, 1)
-        word = word.lower()
+        c, words = line.split(None, 1)
+        words = words.lower()
         if c not in classes:
             classes[c] = set()
-        classes[c].add(word)
+        classes[c].add(words)
 
     extractors = {}
     for c,dict in classes.iteritems():

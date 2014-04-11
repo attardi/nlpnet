@@ -17,6 +17,26 @@ ctypedef np.float_t FLOAT_t
 ctypedef np.int_t INT_t
 ctypedef Py_ssize_t INDEX_t
 
+cdef hardtanh(np.ndarray weights):
+    cdef int i
+    cdef float w
+    for i in range(len(weights)):
+        w = weights[i]
+        if w < -1:
+            weights[i] = -1
+        elif w > 1:
+            weights[i] = 1
+
+cdef hardtanhd(np.ndarray[FLOAT_t, ndim=2] weights):
+    """derivative of hardtanh"""
+    cdef np.ndarray out = np.zeros_like(weights)
+    cdef int i
+    cdef float w
+    for i, w in enumerate(weights.flat):
+        if -1.0 < w < 1.0:
+            out.flat[i] = 1.0
+    return out
+
 cdef class Network:
     
     # sizes and learning rates
@@ -25,7 +45,7 @@ cdef class Network:
     
     # padding stuff
     cdef np.ndarray padding_left, padding_right
-    cdef np.ndarray pre_padding, pos_padding
+    cdef public np.ndarray pre_padding, pos_padding
     
     # weights, biases, calculated values
     cdef readonly np.ndarray hidden_weights, output_weights
@@ -143,9 +163,12 @@ Output size: %d
 
         # store the output in self in order to use in the backprop
         self.input_values = input_data
+        # (hidden_size, input_size) . input_size = hidden_size
         self.hidden_values = self.hidden_weights.dot(input_data)
         self.hidden_values += self.hidden_bias
-        self.hidden_values = np.tanh(self.hidden_values)
+        #self.hidden_values = np.tanh(self.hidden_values)
+        # senna. Attardi
+        hardtanh(self.hidden_values)
         
         cdef np.ndarray output = self.output_weights.dot(self.hidden_values)
         output += self.output_bias
@@ -579,7 +602,10 @@ Output size: %d
         cdef np.ndarray[FLOAT_t, ndim=2] hidden_gradients = self.net_gradients.dot(self.output_weights)
         
         # the derivative of tanh(x) is 1 - tanh^2(x)
-        cdef np.ndarray derivatives = 1 - self.hidden_sent_values ** 2
+        #cdef np.ndarray derivatives = 1 - self.hidden_sent_values ** 2
+        # senna. Attardi
+        # the derivative of htanh(x) is 1 if -1 < x < 1, else 0
+        cdef np.ndarray derivatives = hardtanhd(self.hidden_sent_values)
         hidden_gradients *= derivatives
         
         # backpropagate to input layer (in order to adjust features)
