@@ -34,7 +34,7 @@ def get_args():
                         help='Learning rate for features',
                         dest='learning_rate_features')
     parser.add_argument('--lt', type=float, default=0,
-                        help='Learning rate for transitions (SRL only)',
+                        help='Learning rate for transitions',
                         dest='learning_rate_transitions')
     parser.add_argument('--caps', const=5, nargs='?', type=int, default=None,
                         help='Include capitalization features. Optionally, supply the number of features (default 5)')

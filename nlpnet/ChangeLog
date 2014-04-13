@@ -1,3 +1,20 @@
+2014-04-13  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* arguments.py (get_args): option --lt is not just for SRL.
+
+	* network.pyx (tag_sentence): eliminated unused argument logprob.
+	(_viterbi): dropped unused param allow_repeats.
+	(Network): renamed train_hits to validation_hits, train_items to
+	validation_items
+	(_validate): perform validation on held out sentences.
+
+2014-04-12  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* network.pyx (train): dump model whenever accuracy improves.
+	Eliminated termination on dropping accuracy.
+	Replaced print with logging.
+	(create_new): use uniform distribution with variance = 1/sqrt(fanin)
+
 2014-04-10  Giuseppe Attardi  <attardi@di.unipi.it>
 
 	* attributes.py (Suffix.get_suffix): check for PADDING.

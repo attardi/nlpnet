@@ -98,7 +98,8 @@ def main():
         convertSenna(sennaFile, embeddingsfile, word_dict_file)
     elif word2embeddingFile:
         convertWord2embedding(word2embeddingFile, embeddingsfile, word_dict_file, vocabulary)
-    showHelp()
+    else:
+        showHelp()
 
 if __name__ == '__main__':
     main()

@@ -12,6 +12,7 @@ cimport cython
 from cpython cimport bool
 import math
 from itertools import izip
+import logging
 
 ctypedef np.float_t FLOAT_t
 ctypedef np.int_t INT_t
@@ -67,8 +68,8 @@ cdef class Network:
     cdef readonly np.ndarray input_sent_values, hidden_sent_values
     
     # data for statistics during training. 
-    cdef float error, accuracy
-    cdef int total_items, train_hits, skips, float_errors
+    cdef float error, accuracy, float_errors
+    cdef int train_items, skips
     
     # function to save periodically
     cdef public object saver
@@ -85,10 +86,24 @@ cdef class Network:
         
         # creates the weight matrices
         # all weights are between -0.1 and +0.1
-        hidden_weights = 0.2 * np.random.random((hidden_size, input_size)) - 0.1
-        hidden_bias = 0.2 * np.random.random(hidden_size) - 0.1
-        output_weights = 0.2 * np.random.random((output_size, hidden_size)) - 0.1
-        output_bias = 0.2 * np.random.random(output_size) - 0.1
+        # hidden_weights = 0.2 * np.random.random((hidden_size, input_size)) - 0.1
+        # hidden_bias = 0.2 * np.random.random(hidden_size) - 0.1
+        # output_weights = 0.2 * np.random.random((output_size, hidden_size)) - 0.1
+        # output_bias = 0.2 * np.random.random(output_size) - 0.1
+
+	# centered uniform distribution with variance = 1/sqrt(fanin)
+	# variance = 1/12 interval ^ 2
+	# interval = 3.46 / fanin ^ 1/4
+        #high = 1.732 / np.power(input_size, 0.25) # 0.416
+        #high = 2.38 / np.sqrt(input_size) # [Bottou-88]
+        high = 0.1
+        hidden_weights = np.random.uniform(-high, high, (hidden_size, input_size))
+        hidden_bias = np.random.uniform(-high, high, (hidden_size))
+        #high = 1.732 * np.power(hidden_size, 0.25)
+        #high = 2.38 * np.sqrt(hidden_size) # [Bottou-88]
+        high = 0.1
+        output_weights = np.random.uniform(-high, high, (output_size, hidden_size))
+        output_bias = np.random.uniform(-high, high, (output_size))
         
         net = Network(word_window, input_size, hidden_size, output_size,
                       hidden_weights, hidden_bias, output_weights, output_bias)
@@ -156,8 +171,8 @@ Output size: %d
         input_data = np.concatenate(
                                     [table[index] 
                                      for token_indices in indices
-                                     for index, table in zip(token_indices, 
-                                                             self.feature_tables)
+                                     for index, table in izip(token_indices, 
+                                                              self.feature_tables)
                                      ]
                                     )
 
@@ -199,18 +214,18 @@ Output size: %d
             self.padding_right = padding_right
             self.pos_padding = np.array((self.word_window_size / 2) * [padding_right])
     
-    def tag_sentence(self, np.ndarray sentence, logprob=False):
+    def tag_sentence(self, np.ndarray sentence):
         """
         Runs the network for each element in the sentence and returns 
         the sequence of tags.
         
         :param sentence: a 2-dim numpy array, where each item encodes a token.
-        :param logprob: a boolean indicating whether to return the log-probability for 
-            each answer or not.
         """
-        return self._tag_sentence(sentence, train=False, logprob=logprob)
-    
-    def _tag_sentence(self, np.ndarray sentence, bool train=False, tags=None, logprob=False):
+        scores = self._tag_sentence(sentence, train=False)
+        # computes full score, combining ftheta and A (if SLL)
+        return self._viterbi(scores)
+
+    def _tag_sentence(self, np.ndarray sentence, bool train=False, tags=None):
         """
         Runs the network for each element in the sentence and returns 
         the sequence of tags.
@@ -218,8 +233,7 @@ Output size: %d
         :param sentence: a 2-dim numpy array, where each item encodes a token.
         :param train: if True, perform weight and feature correction.
         :param tags: the correct tags (needed when training)
-        :param logprob: a boolean indicating whether to return the log-probability for 
-            each answer or not.
+        :return: the scores for all tokens
         """
         cdef np.ndarray answer
         # scores[t, i] = ftheta_i,t = score for i-th tag, t-th word
@@ -234,59 +248,20 @@ Output size: %d
                                                      sentence,
                                                      self.pos_padding))
 
-        # get the first window
-        cdef np.ndarray window = padded_sentence[:self.word_window_size]
-        cdef np.ndarray result = self.run(window)
-        scores[0] = result
-        if train:
-            self.input_sent_values[0] = self.input_values
-            self.hidden_sent_values[0] = self.hidden_values
-        
-        # Attardi: not used
-        # cdef object iter_tags
-        # if train:
-        #     iter_tags = iter(tags)
-        
-        # run for the rest of the windows in the sentence
-        cdef np.ndarray element
-        for i, element in enumerate(padded_sentence[self.word_window_size:], 1):
-            window = np.vstack((window[1:], element))
+        # run through all windows in the sentence
+        for i in xrange(len(sentence)):
+            window = padded_sentence[i: i+self.word_window_size]
             scores[i] = self.run(window)
             if train:
                 self.input_sent_values[i] = self.input_values
                 self.hidden_sent_values[i] = self.hidden_values 
         
-        # computes full score, combining ftheta and A (if SLL)
-        answer = self._viterbi(scores)
         if train:
-            self._evaluate(answer, tags) # count hits
             if self._calculate_gradients_all_tokens(tags, scores):
 #            if self._calculate_gradients_wll(tags, scores):
                 self._backpropagate(sentence)
-                if self.transitions is not None: self._adjust_transitions()
          
-        if logprob:
-            if self.transitions is not None:
-                all_scores = self._calculate_all_scores(scores)
-                last_token = len(sentence) - 1
-                logadd = np.log(np.sum(np.exp(all_scores[last_token])))
-                confidence = self.answer_score - logadd
-            
-            else:
-                confidence = np.prod(scores.max(1))
-            
-            answer = (answer, confidence)
-         
-        return answer
-    
-    def _evaluate(self, answer, tags):
-        """
-        Evaluates the network performance, updating its hits count.
-        """
-        for net_tag, gold_tag in zip(answer, tags):
-            if net_tag == gold_tag:
-                self.train_hits += 1
-        self.total_items += len(tags)
+        return scores
     
     def _calculate_all_scores(self, scores):
         """
@@ -300,15 +275,14 @@ Output size: %d
         # (use long double because taking exp's leads to very very big numbers)
         # scores[t][k] = ftheta_k,t
         delta = np.longdouble(scores)
-        # transitions[len(sentence)] represents initial transition, A_i,0 in paper
-        # delta_0(k) = ftheta_k,0 + A_i,0
+        # transitions[len(sentence)] represents initial transition, A_0,i in paper (mispelled as A_i,0)
+        # delta_0(k) = ftheta_k,0 + A_0,i
         delta[0] += self.transitions[-1]
         
         # logadd for the remaining tokens
         # delta_t(k) = ftheta_k,t + logadd_i(delta_t-1(i) + A_i,k)
         #            = ftheta_k,t + log(Sum_i(exp(delta_t-1(i) + A_i,k)))
         transitions = self.transitions[:-1].T # A_k,i
-        #for token, _ in enumerate(delta[1:], 1):
         for token in xrange(1, len(delta)):
             # sum by rows
             logadd = np.log(np.sum(np.exp(delta[token - 1] + transitions), 1))
@@ -350,6 +324,7 @@ Output size: %d
 
         return True
 
+    @cython.boundscheck(False)
     def _calculate_gradients_all_tokens(self, tags, scores):
         """
         Calculates the output and transition deltas for each token.
@@ -452,13 +427,9 @@ Output size: %d
             last_tag = tag
         
         return True
-        
-    def _adjust_transitions(self):
-        """Adjusts the transition scores table with the calculated gradients."""
-        self.transitions += self.trans_gradients * self.learning_rate_trans
     
     @cython.boundscheck(False)
-    def _viterbi(self, np.ndarray[FLOAT_t, ndim=2] scores, bool allow_repeats=True): # allow_repeats not used. Attardi
+    def _viterbi(self, np.ndarray[FLOAT_t, ndim=2] scores):
         """
         Performs a Viterbi search over the scores for each tag using
         the transitions matrix. If a matrix wasn't supplied, 
@@ -518,16 +489,25 @@ Output size: %d
         :param desired_accuracy: training stops if the desired accuracy
             is reached. Ignored if 0.
         """
-        print "Training for up to %d epochs" % epochs
+        logger = logging.getLogger("Logger")
+        logger.info("Training for up to %d epochs" % epochs)
+        top_accuracy = 0
         last_accuracy = 0
+        min_error = np.Infinity 
         last_error = np.Infinity 
         
         np.seterr(all='raise')
 
-        for i in range(epochs):
+        for i in xrange(epochs):
             self._train_epoch(sentences, tags)
             
-            self.accuracy = float(self.train_hits) / self.total_items
+            # Attardi: save model
+            if self.error < min_error:
+                min_error = self.error
+                self.saver(self)
+
+            if self.accuracy > top_accuracy:
+                top_accuracy = self.accuracy
             
             if (epochs_between_reports > 0 and i % epochs_between_reports == 0) \
                 or self.accuracy >= desired_accuracy > 0 \
@@ -538,45 +518,32 @@ Output size: %d
                 if self.accuracy >= desired_accuracy > 0:
                     break
                 
-                if self.accuracy < last_accuracy and self.error > last_error:
-                    # accuracy is falling, the network is probably diverging
-                    break
-
-            	# Attardi: save model
-                self.saver(self)
-
             last_accuracy = self.accuracy
             last_error = self.error
-        
-        self.error = 0
-        self.float_errors = 0
-        self.skips = 0
-        self.train_hits = 0
-        self.total_items = 0
             
     def _print_epoch_report(self, int num):
         """
         Reports the status of the network in the given training
         epoch, including error and accuracy.
         """
-        cdef float error = self.error / self.total_items
-        print "%d epochs   Error: %f   Accuracy: %f   " \
+        cdef float error = self.error / self.train_items
+        logger = logging.getLogger("Logger")
+        logger.info("%d epochs   Error: %f   Accuracy: %f   " \
             "%d corrections could be skipped   " \
             "%d floating point errors" % (num,
                                           error,
                                           self.accuracy,
                                           self.skips,
-                                          self.float_errors)
+                                          self.float_errors))
     
     def _train_epoch(self, list sentences, list tags):
         """
         Trains for one epoch with all examples.
         """
-        self.train_hits = 0
         self.error = 0
-        self.total_items = 0
         self.skips = 0
         self.float_errors = 0
+        self.train_items = 0
         
         # shuffle data
         # get the random number generator state in order to shuffle
@@ -586,13 +553,36 @@ Output size: %d
         np.random.set_state(random_state)
         np.random.shuffle(tags)
         
+        # keep last 2% for validation
+        validation = int(len(sentences) * 0.98)
+        i = 0
         for sent, sent_tags in izip(sentences, tags):
             try:
                 self._tag_sentence(sent, True, sent_tags)
+                self.train_items += len(sent)
             except FloatingPointError:
                 # just ignore the sentence in case of an overflow
                 self.float_errors += 1
-                continue
+            i += 1
+            if i == validation:
+                break
+        self._validate(sentences, tags, validation)
+
+    def _validate(self, sentences, tags, idx):
+        """Perform validation on held out data and estimate accuracy"""
+        tokens = 0
+        hits = 0
+        for i in xrange(idx, len(sentences)):
+            sent = sentences[i]
+            gold_tags = tags[i]
+            scores = self._tag_sentence(sent, False)
+            answer = self._viterbi(scores)
+            for pred_tag, gold_tag in izip(answer, gold_tags):
+                if pred_tag == gold_tag:
+                    hits += 1
+                tokens += 1
+        self.accuracy = float(hits) / tokens
+
     
     def _backpropagate(self, sentence):
         """Backpropagate the error gradient."""
@@ -603,7 +593,7 @@ Output size: %d
         
         # the derivative of tanh(x) is 1 - tanh^2(x)
         #cdef np.ndarray derivatives = 1 - self.hidden_sent_values ** 2
-        # senna. Attardi
+        # SENNA. Attardi
         # the derivative of htanh(x) is 1 if -1 < x < 1, else 0
         cdef np.ndarray derivatives = hardtanhd(self.hidden_sent_values)
         hidden_gradients *= derivatives
@@ -670,7 +660,7 @@ Output size: %d
         #         table_deltas = input_deltas[:, start_from:start_from + table.shape[1]]
         #         start_from += table.shape[1]
         #         # token = [index in each feature_tables]. Attardi
-        #         for token, deltas in zip(padded_sentence[i:], table_deltas):
+        #         for token, deltas in izip(padded_sentence[i:], table_deltas):
         #             table[token[j]] += deltas
 
         cdef np.ndarray[INT_t, ndim=1] features
@@ -686,6 +676,9 @@ Output size: %d
                     table[features[t]] += w_deltas[start:end]
                     start = end
 
+        # Adjusts the transition scores table with the calculated gradients.
+        if self.transitions is not None:
+            self.transitions += self.trans_gradients * self.learning_rate_trans
 
     def save(self, filename):
         """
