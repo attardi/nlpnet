@@ -2,7 +2,7 @@
 
 """
 This script contains the definition of the Metadata class.
-It can also be invoked in order to create a Metada object
+It can also be invoked in order to create a Metadata object
 and save it to a file in the data directory.
 """
 
@@ -17,7 +17,8 @@ class Metadata(object):
     parameter files.
     """
     
-    def __init__(self, task, use_caps=True, use_suffix=False, use_pos=False, use_chunk=False, use_lemma=False, use_gazetteer=False):
+    def __init__(self, task, use_caps=True, use_suffix=False, use_pos=False,
+                 use_chunk=False, use_lemma=False, use_gazetteer=False):
         self.task = task
         self.use_caps = use_caps
         self.use_suffix = use_suffix
@@ -73,10 +74,8 @@ class Metadata(object):
 
         if task == 'ner':
             self.gazetteer = 'gazetteer_ner' # gazetteer file
-            self.gaz_loc_features = 'gazl_features_ner'
-            self.gaz_misc_features = 'gazm_features_ner'
-            self.gaz_org_features = 'gazo_features_ner'
-            self.gaz_per_features = 'gazp_features_ner'
+            self.gaz_features = 'gaz_features_ner'
+            self.gaz_classes = ['LOC', 'MISC', 'ORG', 'PER']
     
     def __str__(self):
         """Shows the task at hand and which attributes are used."""

@@ -107,10 +107,8 @@ class NerReader(TaggerReader):
         """
         super(NerReader, self).create_converter(metadata)
         inGazetteer = gazetteer(config.FILES[metadata.gazetteer])
-        self.converter.add_extractor(inGazetteer['LOC'])
-        self.converter.add_extractor(inGazetteer['MISC'])
-        self.converter.add_extractor(inGazetteer['ORG'])
-        self.converter.add_extractor(inGazetteer['PER'])
+        for c in metadata.gaz_classes:
+            self.converter.add_extractor(inGazetteer[c])
 
 class NerTagReader(NerReader):
     """

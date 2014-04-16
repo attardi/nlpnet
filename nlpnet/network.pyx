@@ -16,9 +16,39 @@ import logging
 
 ctypedef np.float_t FLOAT_t
 ctypedef np.int_t INT_t
-ctypedef Py_ssize_t INDEX_t
 
-cdef hardtanh(np.ndarray weights):
+cdef float eps = 2.2e-44
+
+# ----------------------------------------------------------------------
+# Math functions
+
+cdef logsumexp(np.ndarray a, axis=None):
+    """Compute the log of the sum of exponentials of input elements.
+    like: scipy.misc.logsumexp
+
+    Parameters
+    ----------
+    a : array_like
+        Input array.
+    axis : int, optional
+        Axis over which the sum is taken. By default `axis` is None,
+        and all elements are summed.
+
+    Returns
+    -------
+    res : ndarray
+        The result, ``np.log(np.sum(np.exp(a)))`` calculated in a numerically
+        more stable way.
+    """
+    if axis is None:
+        a = a.ravel()
+    else:
+        a = np.rollaxis(a, axis)
+    a_max = a.max(axis=0)
+    return np.log(np.sum(np.exp(a - a_max), axis=0)) + a_max
+
+cdef hardtanh(np.ndarray[FLOAT_t, ndim=1] weights):
+    """Hard hyperbolic tangent."""
     cdef int i
     cdef float w
     for i in range(len(weights)):
@@ -37,6 +67,8 @@ cdef hardtanhd(np.ndarray[FLOAT_t, ndim=2] weights):
         if -1.0 < w < 1.0:
             out.flat[i] = 1.0
     return out
+
+# ----------------------------------------------------------------------
 
 cdef class Network:
     
@@ -85,23 +117,18 @@ cdef class Network:
         input_size *= word_window
         
         # creates the weight matrices
-        # all weights are between -0.1 and +0.1
-        # hidden_weights = 0.2 * np.random.random((hidden_size, input_size)) - 0.1
-        # hidden_bias = 0.2 * np.random.random(hidden_size) - 0.1
-        # output_weights = 0.2 * np.random.random((output_size, hidden_size)) - 0.1
-        # output_bias = 0.2 * np.random.random(output_size) - 0.1
 
-	# centered uniform distribution with variance = 1/sqrt(fanin)
+	# SENNA: centered uniform distribution with variance = 1/sqrt(fanin)
 	# variance = 1/12 interval ^ 2
 	# interval = 3.46 / fanin ^ 1/4
-        #high = 1.732 / np.power(input_size, 0.25) # 0.416
-        #high = 2.38 / np.sqrt(input_size) # [Bottou-88]
-        high = 0.1
+        #high = 1.732 / np.power(input_size, 0.25) # SENNA: 0.416
+        high = 2.38 / np.sqrt(input_size) # [Bottou-88]
+        #high = 0.1              # Fonseca
         hidden_weights = np.random.uniform(-high, high, (hidden_size, input_size))
         hidden_bias = np.random.uniform(-high, high, (hidden_size))
-        #high = 1.732 * np.power(hidden_size, 0.25)
-        #high = 2.38 * np.sqrt(hidden_size) # [Bottou-88]
-        high = 0.1
+        #high = 1.732 / np.power(hidden_size, 0.25) # SENNA
+        high = 2.38 / np.sqrt(hidden_size) # [Bottou-88]
+        #high = 0.1              # Fonseca
         output_weights = np.random.uniform(-high, high, (output_size, hidden_size))
         output_bias = np.random.uniform(-high, high, (output_size))
         
@@ -257,10 +284,10 @@ Output size: %d
                 self.hidden_sent_values[i] = self.hidden_values 
         
         if train:
-            if self._calculate_gradients_all_tokens(tags, scores):
+            if self._calculate_gradients_sll(tags, scores):
 #            if self._calculate_gradients_wll(tags, scores):
                 self._backpropagate(sentence)
-         
+
         return scores
     
     def _calculate_all_scores(self, scores):
@@ -274,7 +301,9 @@ Output size: %d
         # it turns out that logadd = log(exp(score)) = score
         # (use long double because taking exp's leads to very very big numbers)
         # scores[t][k] = ftheta_k,t
+        # No longer needed, since we use logsumexp
         delta = np.longdouble(scores)
+        #delta = scores
         # transitions[len(sentence)] represents initial transition, A_0,i in paper (mispelled as A_i,0)
         # delta_0(k) = ftheta_k,0 + A_0,i
         delta[0] += self.transitions[-1]
@@ -285,13 +314,15 @@ Output size: %d
         transitions = self.transitions[:-1].T # A_k,i
         for token in xrange(1, len(delta)):
             # sum by rows
-            logadd = np.log(np.sum(np.exp(delta[token - 1] + transitions), 1))
+            #logadd = np.log(np.sum(np.exp(delta[token - 1] + transitions), 1))
+            logadd = logsumexp(delta[token - 1] + transitions, 1)
             delta[token] += logadd
             
         return delta
     
     def _calculate_gradients_wll(self, tags, scores):
         """
+        Calculates the output for each token, using Word Level Likelihood.
         The aim is to minimize the word-level log-likelihood:
         C(ftheta) = logadd_j(ftheta_j) - ftheta_y,
         where y is the sequence of correct tags
@@ -303,7 +334,7 @@ Output size: %d
         # initialize gradients
         # ((len(sentence), self.output_size)) // Attardi
         # dC / dftheta.T
-        self.net_gradients = np.zeros_like(scores, np.float)
+        #self.net_gradients = np.zeros_like(scores, np.float)
 
         # compute the negative gradient with respect to ftheta
         # dC / dftheta_i) = e(ftheta_i)/Sum_k(e(ftheta_k))
@@ -319,15 +350,18 @@ Output size: %d
             correct_path_score += net_scores[tag]
 
         # C(ftheta) = logadd_j(ftheta_j) - score(correct path)
-        error = np.log(np.sum(np.exp(scores))) - correct_path_score
+        #error = np.log(np.sum(np.exp(scores))) - correct_path_score
+        error = logsumexp(scores) - correct_path_score
+        # approximate
+        #error = np.max(scores) - correct_path_score
         self.error += error
 
         return True
 
     @cython.boundscheck(False)
-    def _calculate_gradients_all_tokens(self, tags, scores):
+    def _calculate_gradients_sll(self, tags, scores):
         """
-        Calculates the output and transition deltas for each token.
+        Calculates the output and transition deltas for each token, using Sentence Level Likelihood.
         The aim is to minimize the cost:
         C(ftheta,A) = logadd(scores for all possible paths) - score(correct path)
         
@@ -351,7 +385,10 @@ Output size: %d
         # logadd_i(delta_T(i)) = log(Sum_i(exp(delta_T(i))))
         # Sentence-level Log-Likelihood (SLL)
         # C(ftheta,A) = logadd_j(s(x, j, theta, A)) - score(correct path)
-        error = np.log(np.sum(np.exp(delta[-1]))) - correct_path_score
+        #error = np.log(np.sum(np.exp(delta[-1]))) - correct_path_score
+        error = logsumexp(delta[-1]) - correct_path_score
+        # approximate
+        #error = np.max(delta[-1]) - correct_path_score
         self.error += error
         
         # if the error is too low, don't bother training (saves time and avoids
@@ -376,13 +413,19 @@ Output size: %d
         
         # compute the gradients for the last token
         # dC_logadd / ddelta_T(i) = e(delta_T(i))/Sum_k(e(delta_T(k)))
-        exponentials = np.exp(delta[-1])
-        exp_sum = np.sum(exponentials)
+        # Compute it using the log:
+        # log(e(delta_T(i))/Sum_k(e(delta_T(k)))) =
+        # log(e(delta_T(i))) - log(Sum_k(e(delta_T(k)))) =
+        # delta_T(i) - logsumexp(delta_T(k))
+        # dC_logadd / ddelta_T(i) = e(delta_T(i) - logsumexp(delta_T(k)))
+        sumlogadd = logsumexp(delta[-1])
+        log_gradients = delta[-1] - sumlogadd
         # negative gradients
-        self.net_gradients[-1] = -exponentials / exp_sum
-        
+        self.net_gradients[-1] = -np.exp(log_gradients)
+
         transitions_t = 0 if self.transitions is None else self.transitions[:-1].T
         
+        logger = logging.getLogger("Logger")
         # now compute the gradients for the other tokens, from last to first
         for token in range(len(scores) - 2, -1, -1):
             
@@ -393,15 +436,25 @@ Output size: %d
             # Obtained by transposing twice
             # [e(delta_t-1(i)+A_j,i)]T
             # (output_size, output_size)
-            exp_matrix = np.exp(delta[token] + transitions_t).T
+            # exp_matrix = np.exp(delta[token] + transitions_t).T
             
-            # the sums of exps, used to calculate the softmax
+            # # the sums of exps, used to calculate the softmax
+            # # sum the exponentials by column
+            # denominators = np.sum(exp_matrix, 0)
+            
+            # # softmax is the division of an exponential by the sum of all exponentials
+            # # (yields a probability)
+            # softmax = exp_matrix / denominators
+
+            # compute by the log
+            # the log of the sums of exps, used to calculate the softmax
             # sum the exponentials by column
-            denominators = np.sum(exp_matrix, 0)
+            token_scores = (delta[token] + transitions_t).T
+            log_sum_scores = logsumexp(token_scores, 0)
             
             # softmax is the division of an exponential by the sum of all exponentials
             # (yields a probability)
-            softmax = exp_matrix / denominators
+            softmax = np.exp(token_scores - log_sum_scores)
             
             # multiply each value in the softmax by the gradient at the next tag
             # dC_logadd / ddelta_t(i) * softmax
@@ -413,7 +466,7 @@ Output size: %d
             # Sum_j(dC_logadd / ddelta_t(j) * softmax)
             # Attardi: negative since grad_times_softmax already negative
             self.net_gradients[token] = np.sum(grad_times_softmax, 1)
-        
+
         # find the gradients for the starting transition
         # there is only one possibility to come from, which is the sentence start
         self.trans_gradients[-1] = self.net_gradients[0]
@@ -501,6 +554,8 @@ Output size: %d
         for i in xrange(epochs):
             self._train_epoch(sentences, tags)
             
+            # normalize error
+            self.error = self.error / self.train_items if self.train_items else np.Infinity
             # Attardi: save model
             if self.error < min_error:
                 min_error = self.error
@@ -515,7 +570,8 @@ Output size: %d
                 
                 self._print_epoch_report(i + 1)
                 
-                if self.accuracy >= desired_accuracy > 0:
+                if self.accuracy >= desired_accuracy > 0 \
+                        or self.error > last_error:
                     break
                 
             last_accuracy = self.accuracy
@@ -526,12 +582,11 @@ Output size: %d
         Reports the status of the network in the given training
         epoch, including error and accuracy.
         """
-        cdef float error = self.error / self.train_items
         logger = logging.getLogger("Logger")
         logger.info("%d epochs   Error: %f   Accuracy: %f   " \
-            "%d corrections could be skipped   " \
+            "%d corrections skipped   " \
             "%d floating point errors" % (num,
-                                          error,
+                                          self.error,
                                           self.accuracy,
                                           self.skips,
                                           self.float_errors))
@@ -583,7 +638,6 @@ Output size: %d
                 tokens += 1
         self.accuracy = float(hits) / tokens
 
-    
     def _backpropagate(self, sentence):
         """Backpropagate the error gradient."""
         # find the hidden gradients by backpropagating the output
@@ -615,7 +669,7 @@ Output size: %d
         grad_tensor = np.tile(hidden_gradients, [self.input_size, 1, 1]).T
         grad_tensor *= self.input_sent_values
         deltas = grad_tensor.sum(1) * self.learning_rate
-        # Attardi: divide by the fan-in:
+        # SENNA: divide by the fan-in:
         #deltas = grad_tensor.sum(1) * (self.learning_rate / self.input_size)
         self.hidden_weights += deltas
         self.hidden_bias += hidden_gradients.sum(0) * self.learning_rate
@@ -625,10 +679,11 @@ Output size: %d
         grad_tensor = np.tile(self.net_gradients, [self.hidden_size, 1, 1]).T
         grad_tensor *= self.hidden_sent_values
         deltas = grad_tensor.sum(1) * self.learning_rate
-        # Attardi: divide by the fan-in:
+        # SENNA: divide by the fan-in:
         #deltas = grad_tensor.sum(1) * (self.learning_rate / self.hidden_size)
         self.output_weights += deltas
         self.output_bias += self.net_gradients.sum(0) * self.learning_rate
+        # SENNA: divide by the fan-in:
         #self.output_bias += self.net_gradients.sum(0) * (self.learning_rate / self.hidden_size)
         
         """

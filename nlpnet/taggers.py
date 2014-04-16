@@ -52,14 +52,9 @@ def load_network(md):
         tables.append(chunk_features)
     # NER gazetteers
     if md.use_gazetteer:
-        features = utils.load_features_from_file(config.FILES[md.gaz_loc_features])
-        tables.append(features)
-        features = utils.load_features_from_file(config.FILES[md.gaz_misc_features])
-        tables.append(features)
-        features = utils.load_features_from_file(config.FILES[md.gaz_org_features])
-        tables.append(features)
-        features = utils.load_features_from_file(config.FILES[md.gaz_per_features])
-        tables.append(features)
+        for gaz_file in config.FILES[md.gaz_features]:
+            features = utils.load_features_from_file(gaz_file)
+            tables.append(features)
 
     nn.feature_tables = tables
     

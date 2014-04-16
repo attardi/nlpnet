@@ -158,10 +158,8 @@ def save_features(nn, md):
 
     # NER gazetteer features
     if md.use_gazetteer:
-        utils.save_features_to_file(iter_tables.next(), config.FILES[md.gaz_loc_features])
-        utils.save_features_to_file(iter_tables.next(), config.FILES[md.gaz_misc_features])
-        utils.save_features_to_file(iter_tables.next(), config.FILES[md.gaz_org_features])
-        utils.save_features_to_file(iter_tables.next(), config.FILES[md.gaz_per_features])
+        for file in config.FILES[md.gaz_features]:
+            utils.save_features_to_file(iter_tables.next(), file)
     
 def load_network_train(args, md):
     """Loads and returns a neural network with all the necessary data."""

@@ -1,4 +1,19 @@
+2014-04-15  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* network.pyx (_calculate_all_scores): use logsumexp instead of
+	computing log(sum(exp()))
+	(_calculate_gradients_sll): use logsumexp also for computing
+	net_gradients.
+	(_calculate_all_scores): no need for np.longdouble(scores) since we
+	now use logsumexp.
+
+2014-04-14  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* network.pyx (train): normalize error.
+
 2014-04-13  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* taggers.py (load_network): associate list of files to gaz_features_ner.
 
 	* arguments.py (get_args): option --lt is not just for SRL.
 
