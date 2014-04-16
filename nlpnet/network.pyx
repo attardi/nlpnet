@@ -10,14 +10,13 @@ import numpy as np
 cimport numpy as np
 cimport cython
 from cpython cimport bool
-import math
+
 from itertools import izip
 import logging
 
 ctypedef np.float_t FLOAT_t
 ctypedef np.int_t INT_t
-
-cdef float eps = 2.2e-44
+ctypedef np.longdouble_t DOUBLE_t
 
 # ----------------------------------------------------------------------
 # Math functions
@@ -260,7 +259,7 @@ Output size: %d
         :param sentence: a 2-dim numpy array, where each item encodes a token.
         :param train: if True, perform weight and feature correction.
         :param tags: the correct tags (needed when training)
-        :return: the scores for all tokens
+        :return: a (len(sentence), output_size) array with the scores for all tokens
         """
         cdef np.ndarray answer
         # scores[t, i] = ftheta_i,t = score for i-th tag, t-th word
@@ -369,7 +368,8 @@ Output size: %d
             If False, the error was too low and weight correction should be
             skipped.
         """
-        cdef np.ndarray delta 
+        cdef np.ndarray[DOUBLE_t, ndim=2] delta # (len(sentence), output_size)
+        cdef np.ndarray[DOUBLE_t, ndim=2] delta_softmax # (output_size, output_size)
         
         # ftheta_i,t = score for i-th tag, t-th word
         # s = Sum_i(A_tags[i-1],tags[i] + ftheta_i,i), i = 0, len(sentence)
@@ -419,53 +419,44 @@ Output size: %d
         # delta_T(i) - logsumexp(delta_T(k))
         # dC_logadd / ddelta_T(i) = e(delta_T(i) - logsumexp(delta_T(k)))
         sumlogadd = logsumexp(delta[-1])
-        log_gradients = delta[-1] - sumlogadd
         # negative gradients
-        self.net_gradients[-1] = -np.exp(log_gradients)
+        self.net_gradients[-1] = -np.exp(delta[-1] - sumlogadd)
 
         transitions_t = 0 if self.transitions is None else self.transitions[:-1].T
         
-        logger = logging.getLogger("Logger")
-        # now compute the gradients for the other tokens, from last to first
-        for token in range(len(scores) - 2, -1, -1):
-            
-            # matrix with the exponentials which will be used to find the gradients
-            # sum the scores for all paths ending with each tag in token "token"
-            # with the transitions from this tag to the next
-            # e(delta_t-1(i)+A_i,j)
-            # Obtained by transposing twice
-            # [e(delta_t-1(i)+A_j,i)]T
-            # (output_size, output_size)
-            # exp_matrix = np.exp(delta[token] + transitions_t).T
-            
-            # # the sums of exps, used to calculate the softmax
-            # # sum the exponentials by column
-            # denominators = np.sum(exp_matrix, 0)
-            
-            # # softmax is the division of an exponential by the sum of all exponentials
-            # # (yields a probability)
-            # softmax = exp_matrix / denominators
+        # delta[i][j]: sum of scores of all path that assign tag j to ith-token
 
-            # compute by the log
-            # the log of the sums of exps, used to calculate the softmax
+        # now compute the gradients for the other tokens, from last to first
+        for t in range(len(scores) - 2, -1, -1):
+            
+            # sum the scores for all paths ending with each tag i at token t
+            # with the transitions from tag i to the next tag j
+            # Obtained by transposing twice
+            # [delta_t-1(i)+A_j,i]T
+            path_scores = (delta[t] + transitions_t).T
+
+            # normalize over all possible tag paths using a softmax,
+            # computed using log
+            # the log of the sums of exps
             # sum the exponentials by column
-            token_scores = (delta[token] + transitions_t).T
-            log_sum_scores = logsumexp(token_scores, 0)
+            log_sum_scores = logsumexp(path_scores, 0)
             
             # softmax is the division of an exponential by the sum of all exponentials
             # (yields a probability)
-            softmax = np.exp(token_scores - log_sum_scores)
-            
+            # e(delta_t-1(i)+A_i,j) / Sum_k e(delta_t-1(k)+A_k,j)
+            delta_softmax = np.exp(path_scores - log_sum_scores)
+
             # multiply each value in the softmax by the gradient at the next tag
-            # dC_logadd / ddelta_t(i) * softmax
-            # Attardi: negative since net_gradients[token + 1] already negative
-            grad_times_softmax = self.net_gradients[token + 1] * softmax
+            # dC_logadd / ddelta_t(i) * delta_softmax
+            # Attardi: negative since net_gradients[t + 1] already negative
+            grad_times_softmax = self.net_gradients[t + 1] * delta_softmax
+            # dC / dA_i,j
             self.trans_gradients[:-1, :] += grad_times_softmax
             
             # sum all transition gradients by row to find the network gradients
-            # Sum_j(dC_logadd / ddelta_t(j) * softmax)
+            # Sum_j(dC_logadd / ddelta_t(j) * delta_softmax)
             # Attardi: negative since grad_times_softmax already negative
-            self.net_gradients[token] = np.sum(grad_times_softmax, 1)
+            self.net_gradients[t] = np.sum(grad_times_softmax, 1)
 
         # find the gradients for the starting transition
         # there is only one possibility to come from, which is the sentence start
@@ -501,11 +492,13 @@ Output size: %d
         path_scores[0] = scores[0] + self.transitions[-1]
         
         output_range = np.arange(self.output_size) # outside loop. Attardi
-        #for i, token in enumerate(scores[1:], 1):
+        transitions = self.transitions[:-1]        # idem
+
+        cdef int i
         for i in xrange(1, len(scores)):
             
             # each line contains the score until each tag t plus the transition to each other tag t'
-            prev_score_and_trans = (path_scores[i - 1] + self.transitions[:-1].T).T
+            prev_score_and_trans = (path_scores[i - 1] + transitions.T).T
             
             # find the previous tag that yielded the max score
             path_backtrack[i] = prev_score_and_trans.argmax(0)
@@ -610,6 +603,7 @@ Output size: %d
         
         # keep last 2% for validation
         validation = int(len(sentences) * 0.98)
+
         i = 0
         for sent, sent_tags in izip(sentences, tags):
             try:
@@ -621,6 +615,7 @@ Output size: %d
             i += 1
             if i == validation:
                 break
+
         self._validate(sentences, tags, validation)
 
     def _validate(self, sentences, tags, idx):
@@ -708,16 +703,6 @@ Output size: %d
                                           sentence,
                                           self.pos_padding))
         
-        # for i in range(self.word_window_size):
-        #     for j, table in enumerate(self.feature_tables):
-        #         # this is the column for the i-th position in the window
-        #         # regarding features from the j-th table
-        #         table_deltas = input_deltas[:, start_from:start_from + table.shape[1]]
-        #         start_from += table.shape[1]
-        #         # token = [index in each feature_tables]. Attardi
-        #         for token, deltas in izip(padded_sentence[i:], table_deltas):
-        #             table[token[j]] += deltas
-
         cdef np.ndarray[INT_t, ndim=1] features
         cdef int start, end, t
 
