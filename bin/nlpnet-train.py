@@ -115,8 +115,8 @@ def create_network(args, text_reader, feature_tables, md=None):
         num_tags = len(text_reader.tag_dict)
         nn = Network.create_new(feature_tables, args.window, args.hidden, num_tags)
         if args.learning_rate_transitions > 0:
-            transitions = np.zeros((num_tags + 1, num_tags), np.float)
-            nn.transitions = transitions
+            high = 1
+            nn.transitions = np.random.uniform(-high, high, (num_tags + 1, num_tags))
             nn.learning_rate_trans = args.learning_rate_transitions
 
         padding_left = text_reader.converter.get_padding_left(args.task == 'pos' or args.task == 'ner')
