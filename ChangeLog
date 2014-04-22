@@ -1,3 +1,13 @@
+2014-04-22  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* bin/nlpnet-train.py (saver): use random.seed() if you want to
+	ensure replicability.
+
+2014-04-19  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* bin/nlpnet-train.py (create_network): moved initialization of
+	transitions to Network.create_new().
+
 2014-04-17  Giuseppe Attardi  <attardi@di.unipi.it>
 
 	* bin/nlpnet-train.py (create_network): initialize transition

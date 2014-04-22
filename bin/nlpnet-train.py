@@ -114,10 +114,6 @@ def create_network(args, text_reader, feature_tables, md=None):
         # pos, srl_predicates or ner
         num_tags = len(text_reader.tag_dict)
         nn = Network.create_new(feature_tables, args.window, args.hidden, num_tags)
-        if args.learning_rate_transitions > 0:
-            high = 1
-            nn.transitions = np.random.uniform(-high, high, (num_tags + 1, num_tags))
-            nn.learning_rate_trans = args.learning_rate_transitions
 
         padding_left = text_reader.converter.get_padding_left(args.task == 'pos' or args.task == 'ner')
         padding_right = text_reader.converter.get_padding_right(args.task == 'pos' or args.task == 'ner')
@@ -126,6 +122,7 @@ def create_network(args, text_reader, feature_tables, md=None):
     nn.padding_right = np.array(padding_right)
     nn.learning_rate = args.learning_rate
     nn.learning_rate_features = args.learning_rate_features
+    nn.learning_rate_trans = args.learning_rate_transitions
     
     if args.task == 'lm':
         layer_sizes = (nn.input_size, nn.hidden_size, 1)
@@ -201,6 +198,9 @@ def saver(nn_file, md):
 if __name__ == '__main__':
     args = arguments.get_args()
     args = arguments.check_arguments(args)
+
+    # set the seed for replicability
+    #np.random.seed(42)
 
     logging_level = logging.DEBUG if args.verbose else logging.INFO
     utils.set_logger(logging_level)

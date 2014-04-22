@@ -47,8 +47,9 @@ class Suffix(object):
     """Dummy class for manipulating suffixes and their related codes."""
     codes = {}
     # words smaller than the suffix size
-    small_word = 0
-    other = 1
+    #small_word = 0
+    padding = 0
+    other = 1                   # NOSUFFIX
     num_suffixes = 2
     
     # Attardi: fixed setting (mimic SENNA)
@@ -60,8 +61,7 @@ class Suffix(object):
         loads the listed suffixes from the suffix file.
         """
         Suffix.codes = {}
-        #code = Suffix.other + 1
-        code = 0 # SENNA dump
+        code = Suffix.other + 1
         logger = logging.getLogger("Logger")
         try:
             with open(config.FILES['suffixes'], 'rb') as f:
@@ -70,11 +70,10 @@ class Suffix(object):
                     Suffix.codes[suffix] = code
                     code += 1
             #Suffix.suffix_size = len(suffix)
-            Suffix.num_suffixes = code 
         except IOError:
             logger.warning('Suffix list doesn\'t exist.')
             raise
-        Suffix.other = Suffix.codes.get('NOSUFFIX', code) # SENNA
+        Suffix.num_suffixes = code
     
     @classmethod
     def create_suffix_list(cls, wordlist, num, size, min_occurrences):
@@ -106,14 +105,11 @@ class Suffix(object):
         """
         # if len(word) < Suffix.suffix_size: return Suffix.small_word
         
-        # suffix = word[-Suffix.suffix_size:]
-
-        # Attardi: mimic SENNA
+        # Attardi: handle padding
         if word == WD.padding_left or word == WD.padding_left:
-            return Suffix.codes.get(WD.padding_left, Suffix.other)
+            return Suffix.padding
 
-        l = min(Suffix.suffix_size, len(word))
-        suffix = word[-l:]
+        suffix = word[-Suffix.suffix_size:]
 
         return Suffix.codes.get(suffix.lower(), Suffix.other)
 

@@ -1,3 +1,27 @@
+2014-04-22  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* network.pyx (_tag_sentence): use concatenate instead of vstack,
+	since it is twice faster.
+	(create_new): set seed for replicability.
+	(_backpropagate): rwritten from scratch, following closely the paper.
+	(run): introduced layer2, according to paper.
+
+2014-04-20  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* attributes.py (Suffix.get_suffix): fixed handling of padding
+
+2014-04-19  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* network.pyx (create_new): initialize transitions here.
+	(_backpropagate): eliminated input_sent_values, since it was just
+	a vstack of input_values, and it gets broadcas automatically when
+	multiplied.
+
+2014-04-18  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* network.pyx (train): terminate when both error increases and
+	accuracy decreases.
+
 2014-04-15  Giuseppe Attardi  <attardi@di.unipi.it>
 
 	* network.pyx (_calculate_all_scores): use logsumexp instead of
