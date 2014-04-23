@@ -1,3 +1,7 @@
+2014-04-23  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* arguments.py (get_args): set default to 0.01 for --lf and -lt.
+
 2014-04-22  Giuseppe Attardi  <attardi@di.unipi.it>
 
 	* network.pyx (_tag_sentence): use concatenate instead of vstack,

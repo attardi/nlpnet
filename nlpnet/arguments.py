@@ -25,16 +25,16 @@ def get_args():
                         help="Load previously saved word type features (overrides -f and must also \
                         load a dictionary file)", dest='load_types')
     parser.add_argument('-e', '--epochs', type=int,
-                        help='Number of training epochs',
+                        help='Number of training epochs (default 100)',
                         default=100, dest='iterations')
-    parser.add_argument('-l', '--learning_rate', type=float, default=0.01,
-                        help='Learning rate for network connections',
+    parser.add_argument('-l', '--learning_rate', type=float, default=0.001,
+                        help='Learning rate for network connections (default 0.001)',
                         dest='learning_rate')
-    parser.add_argument('--lf', type=float, default=0,
-                        help='Learning rate for features',
+    parser.add_argument('--lf', type=float, default=0.01,
+                        help='Learning rate for features (default 0.01)',
                         dest='learning_rate_features')
-    parser.add_argument('--lt', type=float, default=0,
-                        help='Learning rate for transitions',
+    parser.add_argument('--lt', type=float, default=0.01,
+                        help='Learning rate for transitions (default 0.01)',
                         dest='learning_rate_transitions')
     parser.add_argument('--caps', const=5, nargs='?', type=int, default=None,
                         help='Include capitalization features. Optionally, supply the number of features (default 5)')
@@ -79,7 +79,7 @@ def get_args():
                         type=str, default='')
     parser.add_argument('--gold', help='File with annotated data for training.', type=str, default=None)
     parser.add_argument('--data', help='Directory to save new models and load partially trained ones', type=str, default=None, required=True)
-    parser.add_argument('--variant', help='If "polyglot" use Polyglot case conventions', type=str, default=None)
+    parser.add_argument('--variant', help='If "polyglot" use Polyglot case conventions; if "senna" use SENNA conventions.', type=str, default=None)
     
     args = parser.parse_args()
     
