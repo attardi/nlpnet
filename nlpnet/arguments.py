@@ -12,9 +12,12 @@ TASKS = set(['pos', 'srl', 'lm', 'ner'])
 
 def get_args():
     parser = argparse.ArgumentParser(description="Trains a neural\
-        network for the language modeling task.\
-        It saves a dictionary file as word_dict.dat")
+        network for a specified task.")
     
+    parser.add_argument('--task', help='Task for which the network should be used.',
+                        type=str, choices=TASKS, required=True)
+    parser.add_argument('--gold', help='File with annotated data for training.', type=str, default=None, required=True)
+    parser.add_argument('--data', help='Directory to save new models and load partially trained ones', type=str, default=None, required=True)
     parser.add_argument('-w', '--window', type=int,
                         help='Size of the word window',
                         default=5, dest='window')
@@ -73,12 +76,8 @@ def get_args():
                         help='Number of features for distance to target word (SRL only)')
     parser.add_argument('--pred_features', type=int, default=5,
                         help='Number of features for distance to predicate (SRL only)')
-    parser.add_argument('--task', help='Task for which the network should be used.',
-                        type=str, choices=TASKS, required=True)
     parser.add_argument('--semi', help='Perform semi-supervised training. Supply the name of the file with automatically tagged data.',
                         type=str, default='')
-    parser.add_argument('--gold', help='File with annotated data for training.', type=str, default=None)
-    parser.add_argument('--data', help='Directory to save new models and load partially trained ones', type=str, default=None, required=True)
     parser.add_argument('--variant', help='If "polyglot" use Polyglot case conventions; if "senna" use SENNA conventions.', type=str, default=None)
     
     args = parser.parse_args()

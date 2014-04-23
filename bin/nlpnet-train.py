@@ -10,7 +10,7 @@ Author: Erick Rocha Fonseca
 import logging
 import numpy as np
 
-# Attardi: allow executing from anywhere without installing package
+# Attardi: allow executing from anywhere without installing the package
 import sys
 import os
 srcdir = os.path.dirname(os.path.realpath(__file__)) + '/../'

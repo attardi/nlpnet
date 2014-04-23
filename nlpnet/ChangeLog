@@ -1,13 +1,14 @@
 2014-04-23  Giuseppe Attardi  <attardi@di.unipi.it>
 
 	* arguments.py (get_args): set default to 0.01 for --lf and -lt.
+	(get_args): made option --gold required.
 
 2014-04-22  Giuseppe Attardi  <attardi@di.unipi.it>
 
 	* network.pyx (_tag_sentence): use concatenate instead of vstack,
 	since it is twice faster.
 	(create_new): set seed for replicability.
-	(_backpropagate): rwritten from scratch, following closely the paper.
+	(_backpropagate): completely rewritten, following closely the paper.
 	(run): introduced layer2, according to paper.
 
 2014-04-20  Giuseppe Attardi  <attardi@di.unipi.it>
@@ -17,9 +18,6 @@
 2014-04-19  Giuseppe Attardi  <attardi@di.unipi.it>
 
 	* network.pyx (create_new): initialize transitions here.
-	(_backpropagate): eliminated input_sent_values, since it was just
-	a vstack of input_values, and it gets broadcas automatically when
-	multiplied.
 
 2014-04-18  Giuseppe Attardi  <attardi@di.unipi.it>
 

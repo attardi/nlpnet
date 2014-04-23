@@ -9,11 +9,14 @@ Command line scripts
 Training
 ~~~~~~~~
 
-The script ``nlpnet-train.py`` can be used to train a model from an annotated corpus.
-The script is invoked as follows::
+The script ``nlpnet-train.py`` can be used to train a model for a specified task from an annotated corpus.
 
-..
-usage: nlpnet-train.py [-h] [-w WINDOW] [-f NUM_FEATURES] [--load_features]
+Specific configuration parameters are provided in the file ``nlpnet/config.py``.
+
+The script is invoked as follows::
+::
+ usage: nlpnet-train.py [-h] --task {lm,ner,pos,srl} --gold GOLD --data DATA
+                       [-w WINDOW] [-f NUM_FEATURES] [--load_features]
                        [-e ITERATIONS] [-l LEARNING_RATE]
                        [--lf LEARNING_RATE_FEATURES]
                        [--lt LEARNING_RATE_TRANSITIONS] [--caps [CAPS]]
@@ -22,15 +25,16 @@ usage: nlpnet-train.py [-h] [-w WINDOW] [-f NUM_FEATURES] [--load_features]
                        [-n HIDDEN] [-c CONVOLUTION] [-v] [--id] [--class]
                        [--pred] [--load_network] [--max_dist MAX_DIST]
                        [--target_features TARGET_FEATURES]
-                       [--pred_features PRED_FEATURES] --task {lm,ner,pos,srl}
-                       [--semi SEMI] [--gold GOLD] --data DATA
-                       [--variant VARIANT]
+                       [--pred_features PRED_FEATURES]
+                       [--semi SEMI] [--variant VARIANT]
 
-Trains a neural network for the language modeling task. It saves a dictionary
-file as word_dict.dat
-
-optional arguments:
+ optional arguments:
   -h, --help            show this help message and exit
+  --task {lm,ner,pos,srl}
+                        Task for which the network should be used.
+  --gold GOLD           File with annotated data for training.
+  --data DATA           Directory to save new models and load partially
+                        trained ones
   -w WINDOW, --window WINDOW
                         Size of the word window
   -f NUM_FEATURES, --num_features NUM_FEATURES
@@ -75,13 +79,8 @@ optional arguments:
   --pred_features PRED_FEATURES
                         Number of features for distance to predicate (SRL
                         only)
-  --task {lm,ner,pos,srl}
-                        Task for which the network should be used.
   --semi SEMI           Perform semi-supervised training. Supply the name of
                         the file with automatically tagged data.
-  --gold GOLD           File with annotated data for training.
-  --data DATA           Directory to save new models and load partially
-                        trained ones
   --variant VARIANT     If "polyglot" use Polyglot case conventions;
                         if "senna" use SENNA conventions.
 
@@ -92,15 +91,15 @@ Tagging
 The script ``nlpnet-tag.py`` can be used for tagging.
 It reads from standard input and can be invoked as follows::
 
-..
+::
 
-usage: nlpnet-tag.py [-h] [-v] [--no-repeat] {srl,pos,ner} data
+ usage: nlpnet-tag.py [-h] [-v] [--no-repeat] {srl,pos,ner} data
 
-positional arguments:
+ positional arguments:
   {srl,pos,ner}  Task for which the network should be used.
   data           Directory containing trained models.
 
-optional arguments:
+ optional arguments:
   -h, --help     show this help message and exit
   -v             Verbose mode
   --no-repeat    Forces the classification step to avoid repeated argument
