@@ -17,25 +17,23 @@ The original version by Erick Fonseca is available at: https://github.com/erickr
 Dependencies
 ------------
 
-``nlpnet`` requires numpy_ and Cython_.
+``nlpnet`` requires numpy_.
 
 NLTK_ is also needed to perform Portuguese tokenization and sentence splitting
 when used as a library (see `Library usage`_).
 
 The POS and NER command line taggers expect instead properly tokenized input.
 
-Cython_ is used to generate C extensions and run faster. You probably won't need it, since the generated ``.c`` file is already provided with `nlpnet`, but you will need a C compiler. On Linux and Mac systems this shouldn't be a problem, but may be on Windows, because  setuptools_ requires the Microsoft C Compiler by default. If you don't have it already, it is usually easier to install MinGW_ instead and follow the instructions `here <http://docs.cython.org/src/tutorial/appendix.html>`_.
+Cython_ is required in development for generating C extensions that run faster. You probably won't need it, since the generated ``.c`` file is already provided with `nlpnet`, but you will need a C compiler.
 
 .. _numpy: http://www.numpy.org
 .. _Cython: http://cython.org
-.. _MinGW: http://www.mingw.org
-.. _setuptools: http://pythonhosted.org/setuptools/
 .. _NLTK: http://www.nltk.org
 
 Basic usage
 -----------
 
-``nlpnet`` can be used both as a Python library or by its standalone scripts. Both usages are explained below.
+``nlpnet`` can be used both as a Python library or through command line scripts. Both usages are explained below.
 
 Library usage
 ~~~~~~~~~~~~~
@@ -82,7 +80,9 @@ Standalone scripts
 ~~~~~~~~~~~~~~~~~~
 
 ``nlpnet`` also provides scripts for tagging text, training new models and testing them. They are copied to the `scripts` subdirectory of your Python installation, which can be included in the system PATH variable. You can call them from command line and give some text input.
-It expects tokenized input, one token per line.
+The scripts expect tokenized input, one token per line, with an empty
+line to separate sentences.
+When training, the token attributes are supplied in tsv format.
 
 .. code-block:: bash
 
@@ -162,7 +162,7 @@ You also need the list of suffixes:
 
 .. code-block:: bash
 
-    cp -p senna/hash/suffix.lst suffixes.txt
+    cp -p senna/hash/suffix.lst model/suffixes.txt
 
 The tagger can then be trained as follows:
 
@@ -180,9 +180,9 @@ The benchmark can be run as:
 
 The results I achieved are::
 
-processed 46435 tokens with 5648 phrases; found: 5641 phrases; correct: 5031.
-accuracy:  97.64%; precision:  89.19%; recall:  89.08%; FB1:  89.13
-              LOC: precision:  92.42%; recall:  91.31%; FB1:  91.86
-             MISC: precision:  78.56%; recall:  77.78%; FB1:  78.17
-              ORG: precision:  85.14%; recall:  86.57%; FB1:  85.85
-              PER: precision:  94.72%; recall:  94.25%; FB1:  94.48
+|processed 46435 tokens with 5648 phrases; found: 5640 phrases; correct: 5031.
+|accuracy:  97.62%; precision:  89.20%; recall:  89.08%; FB1:  89.14
+|              LOC: precision:  93.30%; recall:  91.01%; FB1:  92.14
+|             MISC: precision:  78.24%; recall:  77.35%; FB1:  77.79
+|              ORG: precision:  84.59%; recall:  87.24%; FB1:  85.89
+|              PER: precision:  94.71%; recall:  94.06%; FB1:  94.38
