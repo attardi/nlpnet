@@ -3,42 +3,34 @@
 ===============================================================
 
 ``nlpnet`` is a Python library for Natural Language Processing tasks based on neural networks. 
-Currently, it performs part-of-speech tagging and semantic role labeling. Most of the 
-architecture is language independent, but some functions were specially tailored for working
-with Portuguese.
 
-This system was inspired by SENNA_, but has some conceptual and practical differences. 
-If you use ``nlpnet``, please cite one or both of the articles below, according to your needs (POS or
-SRL):
+It performs part-of-speech tagging, Named Entity tagging and semantic role
+labeling.
+
+This branch is rewrite by Giuseppe Attardi (http://www.di.unipi.it/~attardi)
+to make it consistent with the architecture of SENNA_:
 
 .. _SENNA: http://ronan.collobert.com/senna/
 
-* Fonseca, E. R. and Rosa, J.L.G. *A Two-Step Convolutional Neural Network Approach for Semantic
-  Role Labeling*. Proceedings of the 2013 International Joint Conference on Neural Networks, 2013.
-  p. 2955-2961.
-
-* Fonseca, E. R. and Rosa, J.L.G. *Mac-Morpho Revisited: Towards Robust Part-of-Speech Tagging*. 
-  Proceedings of the 9th Brazilian Symposium in Information and Human Language Technology, 2013. p.  
-  98-107 [`PDF <http://aclweb.org/anthology//W/W13/W13-4811.pdf>`_]
-
-**Important:** in order to use the trained models for Portuguese NLP, you will need to download the data from http://nilc.icmc.usp.br/nilc/download/nlpnet-data.zip and unzip it into some directory.
+The original version by Erick Fonseca is available at: https://github.com/erickrf/nlpnet.
 
 Dependencies
 ------------
 
-``nlpnet`` requires NLTK_ and numpy_. Additionally, it needs to download some data from NLTK. After installing it, call
+``nlpnet`` requires numpy_ and Cython_.
 
-    >>> nltk.download()
+NLTK_ is also needed to perform Portuguese tokenization and sentence splitting
+when used as a library (see `Library usage`_).
 
-go to the `Models` tab and select the Punkt tokenizer. It is used in order to split the text into sentences.
+The POS and NER command line taggers expect instead properly tokenized input.
 
 Cython_ is used to generate C extensions and run faster. You probably won't need it, since the generated ``.c`` file is already provided with `nlpnet`, but you will need a C compiler. On Linux and Mac systems this shouldn't be a problem, but may be on Windows, because  setuptools_ requires the Microsoft C Compiler by default. If you don't have it already, it is usually easier to install MinGW_ instead and follow the instructions `here <http://docs.cython.org/src/tutorial/appendix.html>`_.
 
-.. _NLTK: http://www.nltk.org
 .. _numpy: http://www.numpy.org
 .. _Cython: http://cython.org
 .. _MinGW: http://www.mingw.org
 .. _setuptools: http://pythonhosted.org/setuptools/
+.. _NLTK: http://www.nltk.org
 
 Basic usage
 -----------
@@ -60,9 +52,12 @@ You can use ``nlpnet`` as a library in Python code as follows:
 
 In the example above, the call to ``set_data_dir`` indicates where the data directory is located. This location must be given whenever ``nlpnet`` is imported. 
 
-Calling a tagger is pretty straightforward. The two provided taggers are ``POSTagger`` and ``SRLTagger``, both having a method ``tag`` which receives strings with text to be tagged. The tagger splits the text into sentences and then tokenizes each one (hence the return of the POSTagger is a list of lists).
+Calling a tagger is pretty straightforward. The provided taggers are:
+``POSTagger``, ``NERTagger`` and ``SRLTagger``, all having a method ``tag`` which receives strings with text to be tagged. The tagger splits the text into sentences and then tokenizes each one (hence the return of the POSTagger is a list of lists).
 
-The output of the SRLTagger is slightly more complicated:
+The output of the ``NERTagger`` is in ``IOB`` notation.
+
+The output of the ``SRLTagger`` is slightly more complicated:
 
     >>> tagger = nlpnet.SRLTagger()
     >>> tagger.tag(u'O rato roeu a roupa do rei de Roma.')
@@ -87,12 +82,32 @@ Standalone scripts
 ~~~~~~~~~~~~~~~~~~
 
 ``nlpnet`` also provides scripts for tagging text, training new models and testing them. They are copied to the `scripts` subdirectory of your Python installation, which can be included in the system PATH variable. You can call them from command line and give some text input.
+It expects tokenized input, one token per line.
 
 .. code-block:: bash
 
     $ nlpnet-tag.py pos /path/to/nlpnet-data/
-    O rato roeu a roupa do rei de Roma.
-    O_ART rato_N roeu_V a_ART roupa_N do_PREP+ART rei_N de_PREP Roma_NPROP ._PU
+    O
+    rato
+    roeu
+    a
+    roupa
+    do
+    rei
+    de
+    Roma
+    .
+
+    O	ART
+    rato	N
+    roeu	V
+    a	ART
+    roupa	N
+    do	PREP+ART
+    rei	N
+    de	PREP
+    Roma	NPROP
+    .	PU
 
 Or with semantic role labeling:
 
@@ -109,3 +124,65 @@ Or with semantic role labeling:
 The first line was typed by the user, and the second one is the result of tokenization.
 
 To learn more about training and testing new models, and other functionalities, refer to the documentation at http://nilc.icmc.usp.br/nlpnet
+
+Benchmarks
+~~~~~~~~~~
+
+The NER tagger replicates the performance of SENNA_ in the CoNLL 2003 benchmark.
+The CoNLL-2003 shared task data can be downloaded from
+http://www.cnts.ua.ac.be/conll2003/ner/.
+
+The train and test data must be cleaned and converted to the more recent IOB2
+notation, by calling:
+
+.. code-block:: bash
+
+    sed '/-DOCSTART-/,+1d' train | bin/toIOB.py | cut -f 1,2,4 > train.iob
+    sed '/-DOCSTART-/,+1d' testa | bin/toIOB.py | cut -f 1,2,4 > testa.iob
+    sed '/-DOCSTART-/,+1d' testb | bin/toIOB.py | cut -f 1,2,4 > testb.iob
+    cat train.iob testa.iob > train+dev.iob
+
+Assuming that the SENNA distribution is in directory ``senna``,
+the embeddings from SENNA can be adapted for use with ``nlpnet`` with the command:
+
+.. code-block:: bash
+
+    bin/embeddingsAdapter.py -s senna/embeddings/english.tsv model/types-features-ner.npy model/word-dict.pickle
+
+The gazetters from SENNA can be used to produce a single entity list as follows:
+
+.. code-block:: bash
+
+    iconv -f ISO-8859-1 -t UTF-8 < senna/hash/ner.loc.lst | awk '{printf "LOC\t%s\n", $$0}'  > model/eng.list
+    iconv -f ISO-8859-1 -t UTF-8 < senna/hash/ner.misc.lst | awk '{printf "MISC\t%s\n", $$0}' >> model/eng.list
+    iconv -f ISO-8859-1 -t UTF-8 < senna/hash/ner.org.lst | awk '{printf "ORG\t%s\n", $$0}' >> model/eng.list
+    iconv -f ISO-8859-1 -t UTF-8 < senna/hash/ner.per.lst | awk '{printf "PER\t%s\n", $$0}' >> model/eng.list
+
+You also need the list of suffixes:
+
+.. code-block:: bash
+
+    cp -p senna/hash/suffix.lst suffixes.txt
+
+The tagger can then be trained as follows:
+
+.. code-block:: bash
+
+    bin/nlpnet-train.py --task ner --load_features --gazetteer \
+         --data model --gold train+dev.iob -e 40 --variant senna \
+         -l 0.0001 --lf 0.01 --lt 0.01 -w 5 -n 300 --caps --suffix -v
+
+The benchmark can be run as:
+
+.. code-block:: bash
+
+    bin/nlpnet-tag.py ner model < testb.iob > testb.out.iob
+
+The results I achieved are::
+
+processed 46435 tokens with 5648 phrases; found: 5641 phrases; correct: 5031.
+accuracy:  97.64%; precision:  89.19%; recall:  89.08%; FB1:  89.13
+              LOC: precision:  92.42%; recall:  91.31%; FB1:  91.86
+             MISC: precision:  78.56%; recall:  77.78%; FB1:  78.17
+              ORG: precision:  85.14%; recall:  86.57%; FB1:  85.85
+              PER: precision:  94.72%; recall:  94.25%; FB1:  94.48
