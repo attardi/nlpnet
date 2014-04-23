@@ -14,7 +14,7 @@ The script ``nlpnet-train.py`` can be used to train a model for a specified task
 Specific configuration parameters are provided in the file ``nlpnet/config.py``.
 
 The script is invoked as follows::
-::
+
  usage: nlpnet-train.py [-h] --task {lm,ner,pos,srl} --gold GOLD --data DATA
                        [-w WINDOW] [-f NUM_FEATURES] [--load_features]
                        [-e ITERATIONS] [-l LEARNING_RATE]
@@ -90,8 +90,6 @@ Tagging
 
 The script ``nlpnet-tag.py`` can be used for tagging.
 It reads from standard input and can be invoked as follows::
-
-::
 
  usage: nlpnet-tag.py [-h] [-v] [--no-repeat] {srl,pos,ner} data
 
