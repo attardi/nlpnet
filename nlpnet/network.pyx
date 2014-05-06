@@ -22,6 +22,25 @@ ctypedef np.double_t DOUBLE_t
 # ----------------------------------------------------------------------
 # Math functions
 
+cdef softmax(np.ndarray a, axis=0):
+    """Compute the ratio of exp(a) to the sum of exponentials along the axis.
+
+    Parameters
+    ----------
+    a : array_like
+        Input array.
+    axis : int, optional
+        Axis over which the sum is taken. By default `axis` is 0,
+
+    Returns
+    -------
+    res : ndarray
+        The result, ``np.exp(a)/(np.sum(np.exp(a), axis))`` calculated in a numerically stable way.
+    """
+    a_max = a.max(axis)
+    e = np.exp(a - a_max)
+    return e / np.sum(e, axis)
+
 cdef logsumexp(np.ndarray a, axis=None):
     """Compute the log of the sum of exponentials of input elements.
     like: scipy.misc.logsumexp
@@ -86,7 +105,7 @@ cdef class Network:
     # weights, biases, calculated values
     cdef readonly np.ndarray hidden_weights, output_weights
     cdef readonly np.ndarray hidden_bias, output_bias
-    cdef readonly np.ndarray input_values, hidden_values, layer2_values
+    cdef readonly np.ndarray layer2_values, hidden_values
     
     # feature tables
     cdef public list feature_tables
@@ -111,7 +130,7 @@ cdef class Network:
 
     @classmethod
     def create_new(cls, feature_tables, int word_window, int hidden_size, 
-                 int output_size):
+                   int output_size):
         """
         Creates a new neural network.
         """
@@ -196,25 +215,23 @@ Output size: %d
         
         return desc
     
-    
-    def run(self, np.ndarray indices):
-        """
-        Runs the network for a given input. 
-        
+    def lookup(self, np.ndarray indices):
+        """Find the actual input values concatenating the feature vectors
+        for each input token.
         :param indices: a 2-dim np array of indices into the feature tables.
             Each row represents a token through its indices into each feature table.
         """
-        # find the actual input values concatenating the feature vectors
-        # for each input token
-        cdef np.ndarray input_data
-        input_data = np.concatenate([table[index] 
-                                     for token_indices in indices
-                                     for index, table in izip(token_indices, 
-                                                              self.feature_tables)
-                                     ])
-
-        # store the output in self for use in backpropagation
-        self.input_values = input_data
+        return np.concatenate([table[index] 
+                               for token_indices in indices
+                               for index, table in izip(token_indices, 
+                                                        self.feature_tables)
+                               ])
+    
+    def run(self, np.ndarray input_data):
+        """
+        Runs the network for a given input. 
+        
+        """
         # (hidden_size, input_size) . input_size = hidden_size
         self.layer2_values = self.hidden_weights.dot(input_data) + self.hidden_bias
         self.hidden_values = hardtanh(self.layer2_values)
@@ -278,6 +295,7 @@ Output size: %d
             self.hidden_sent_values = np.empty((len(sentence), self.hidden_size))
         
         # add padding to the sentence
+        cdef np.ndarray input_values
         cdef np.ndarray padded_sentence = np.concatenate((self.pre_padding,
                                                           sentence,
                                                           self.pos_padding))
@@ -285,9 +303,10 @@ Output size: %d
         # run through all windows in the sentence
         for i in xrange(len(sentence)):
             window = padded_sentence[i: i+self.word_window_size]
-            scores[i] = self.run(window)
+            input_values = self.lookup(window)
+            scores[i] = self.run(input_values)
             if train:
-                self.input_sent_values[i] = self.input_values
+                self.input_sent_values[i] = input_values
                 self.layer2_sent_values[i] = self.layer2_values
                 self.hidden_sent_values[i] = self.hidden_values
         
@@ -305,25 +324,22 @@ Output size: %d
         In the returned matrix, delta[i][j] means the sum of all scores 
         ending in token i with tag j (delta_i(j) in eq. 14 in the paper)
         """
+        # scores[t][k] = ftheta_k,t
+        delta = scores
         # logadd for first token. the transition score of the starting tag must be used.
         # it turns out that logadd = log(exp(score)) = score
-        # (use long double because taking exp's leads to very very big numbers)
-        # scores[t][k] = ftheta_k,t
-        # No longer needed, since we use logsumexp
-        #delta = np.longdouble(scores)
-        delta = scores
-        # transitions[len(sentence)] represents initial transition, A_0,i in paper (mispelled as A_i,0)
+        # transitions[-1] represents initial transition, A_0,i in paper (mispelled as A_i,0)
         # delta_0(k) = ftheta_k,0 + A_0,i
         delta[0] += self.transitions[-1]
         
         # logadd for the remaining tokens
         # delta_t(k) = ftheta_k,t + logadd_i(delta_t-1(i) + A_i,k)
         #            = ftheta_k,t + log(Sum_i(exp(delta_t-1(i) + A_i,k)))
-        transitions = self.transitions[:-1].T # A_k,i
+        transitions = self.transitions[:-1] # A_i,k
         for token in xrange(1, len(delta)):
-            # sum by rows
-            #logadd = np.log(np.sum(np.exp(delta[token - 1] + transitions), 1))
-            logadd = logsumexp(delta[token - 1] + transitions, 1)
+            # add and sum by columns
+            #logadd = np.log(np.sum(np.exp(delta[token - 1] + transitions.T), 1))
+            logadd = logsumexp(delta[token - 1][:,np.newaxis] + transitions, 0)
             delta[token] += logadd
             
         return delta
@@ -340,7 +356,7 @@ Output size: %d
             skipped.
         """
         cdef np.ndarray[DOUBLE_t, ndim=2] delta # (len(sentence), output_size)
-        cdef np.ndarray[DOUBLE_t, ndim=2] delta_softmax # (output_size, output_size)
+        cdef np.ndarray[DOUBLE_t, ndim=2] path_scores # (output_size, output_size)
         
         # ftheta_i,t = network output for i-th tag, at t-th word
         # s = Sum_i(A_tags[i-1],tags[i] + ftheta_i,i), i < len(sentence)   (12)
@@ -349,7 +365,7 @@ Output size: %d
         for tag, net_scores in izip(tags, scores):
             trans = 0 if self.transitions is None else self.transitions[last_tag, tag]
             correct_path_score += trans + net_scores[tag]
-            last_tag = tag 
+            last_tag = tag
         
         # delta[t] = delta_t in equation (14)
         delta = self._calculate_delta(scores)
@@ -381,14 +397,8 @@ Output size: %d
         
         # compute the gradients for the last token
         # dC_logadd / ddelta_T(i) = e(delta_T(i))/Sum_k(e(delta_T(k)))
-        # Compute it using the log:
-        # log(e(delta_T(i))/Sum_k(e(delta_T(k)))) =
-        # log(e(delta_T(i))) - log(Sum_k(e(delta_T(k)))) =
-        # delta_T(i) - logsumexp(delta_T(k))
-        # dC_logadd / ddelta_T(i) = e(delta_T(i) - logsumexp(delta_T(k)))
-        sumlogadd = logsumexp(delta[-1])
         # negative gradients
-        self.net_gradients[-1] = -np.exp(delta[-1] - sumlogadd)
+        self.net_gradients[-1] = -softmax(delta[-1])
 
         transitions_t = 0 if self.transitions is None else self.transitions[:-1].T
         
@@ -404,24 +414,21 @@ Output size: %d
             path_scores = (delta[t] + transitions_t).T
 
             # normalize over all possible tag paths using a softmax,
-            # computed using log.
-            # the log of the sums of exps, summed by column
-            log_sum_scores = logsumexp(path_scores, 0)
-            
+            # along the columns.
             # softmax is the division of an exponential by the sum of all exponentials
             # (yields a probability)
             # e(delta_t-1(i)+A_i,j) / Sum_k e(delta_t-1(k)+A_k,j)
-            delta_softmax = np.exp(path_scores - log_sum_scores)
+            path_scores = softmax(path_scores)
 
             # multiply each value in the softmax by the gradient at the next tag
-            # dC_logadd / ddelta_t(i) * delta_softmax
+            # dC_logadd / ddelta_t(i) * path_scores
             # Attardi: negative since net_gradients[t + 1] already negative
-            grad_times_softmax = self.net_gradients[t + 1] * delta_softmax
+            grad_times_softmax = self.net_gradients[t + 1] * path_scores
             # dC / dA_i,j
             self.trans_gradients[:-1, :] += grad_times_softmax
             
             # sum all transition gradients by row to find the network gradients
-            # Sum_j(dC_logadd / ddelta_t(j) * delta_softmax)
+            # Sum_j(dC_logadd / ddelta_t(j) * path_scores(j))
             # Attardi: negative since grad_times_softmax already negative
             self.net_gradients[t] = np.sum(grad_times_softmax, 1)
 
@@ -494,8 +501,8 @@ Output size: %d
         # the last row of the transitions table has the scores for the first tag
         path_scores[0] = scores[0] + self.transitions[-1]
         
-        output_range = np.arange(self.output_size) # outside loop. Attardi
-        transitions = self.transitions[:-1]        # idem
+        output_range = np.arange(self.output_size) # outside loop
+        transitions = self.transitions[:-1]        # outside loop
 
         cdef int i
         for i in xrange(1, len(scores)):
@@ -580,12 +587,12 @@ Output size: %d
         """
         logger = logging.getLogger("Logger")
         logger.info("%d epochs   Error: %f   Accuracy: %f   " \
-            "%d corrections skipped   " \
-            "%d floating point errors" % (num,
-                                          self.error,
-                                          self.accuracy,
-                                          self.skips,
-                                          self.float_errors))
+            "%d corrections skipped" % (num,
+                                        self.error,
+                                        self.accuracy,
+                                        self.skips))
+        if self.float_errors:
+            logger.info("%d floating point errors", self.float_errors)
     
     def _train_epoch(self, list sentences, list tags):
         """

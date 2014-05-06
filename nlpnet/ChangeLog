@@ -1,4 +1,40 @@
+2014-05-06  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* network.pyx (_viterbi): fixed bug.
+
+2014-05-05  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* network.pyx (_calculate_gradients_sll): use softmax(delta[-1]).
+
+	* ner/ner_reader.py (noGazetteer): for cases where there is on
+	entry for a class in the gazetteer dictionary.
+
+2014-05-03  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* network.pyx (softmax): added softmax function, for computing
+	softmax directly, without resorting to logsumexp.
+
+2014-05-02  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* network.pyx (_calculate_delta): avoid transpose by using
+            logadd = logsumexp(delta[token - 1][:,np.newaxis] + transitions, 0)
+	instead of
+            logadd = logsumexp(delta[token - 1] + transitions_T, 1)
+
 2014-04-23  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* networkconv.pyx (_convolution_lookup): use lookup().
+
+	* networklm.pyx (_train_pair): use lookup().
+
+	* network.pyx (lookup): added, so that run() method can get the
+	input directly and we need not to store the input in the network.
+
+	* networkconv.pyx (_tag_sentence): use logsumexp to avoid numeric
+	instability.
+
+	* networklm.pyx: class LanguageModel derived from Network so that
+	it inherits attributes and methods, including run().
 
 	* arguments.py (get_args): set default to 0.01 for --lf and -lt.
 	(get_args): made option --gold required.

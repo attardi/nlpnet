@@ -180,9 +180,9 @@ The benchmark can be run as:
 
 The results I achieved are::
 
-|processed 46435 tokens with 5648 phrases; found: 5640 phrases; correct: 5031.
-|accuracy:  97.62%; precision:  89.20%; recall:  89.08%; FB1:  89.14
-|              LOC: precision:  93.30%; recall:  91.01%; FB1:  92.14
-|             MISC: precision:  78.24%; recall:  77.35%; FB1:  77.79
-|              ORG: precision:  84.59%; recall:  87.24%; FB1:  85.89
-|              PER: precision:  94.71%; recall:  94.06%; FB1:  94.38
+processed 46435 tokens with 5648 phrases; found: 5640 phrases; correct: 5031.
+accuracy:  97.62%; precision:  89.20%; recall:  89.08%; FB1:  89.14
+              LOC: precision:  93.30%; recall:  91.01%; FB1:  92.14
+             MISC: precision:  78.24%; recall:  77.35%; FB1:  77.79
+              ORG: precision:  84.59%; recall:  87.24%; FB1:  85.89
+              PER: precision:  94.71%; recall:  94.06%; FB1:  94.38

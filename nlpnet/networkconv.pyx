@@ -5,8 +5,8 @@ A convolutional neural network for NLP tagging tasks like SRL.
 It employs feature tables to store feature vectors for each token.
 """
 
-import numpy as np
-cimport numpy as np
+# import numpy as np
+# cimport numpy as np
 
 cdef class ConvolutionalNetwork(Network):
     
@@ -52,26 +52,31 @@ cdef class ConvolutionalNetwork(Network):
         input_size *= word_window
         
         # creates the weight matrices
-        # all weights are between -0.1 and +0.1
-        hidden_weights = 0.2 * np.random.random((hidden1_size, input_size)) - 0.1
-        hidden_bias = 0.2 * np.random.random(hidden1_size) - 0.1
+        high = 2.38 / np.sqrt(input_size) # [Bottou-88]
+        #high = 0.1              # Fonseca
+        hidden_weights = np.random.uniform(-high, high, ((hidden1_size, input_size)))
+        high = 2.38 / np.sqrt(hidden1_size) # [Bottou-88]
+        hidden_bias = np.random.uniform(-high, high, (hidden1_size))
         
         num_dist_features = word_window * target_dist_table.shape[1]
-        target_dist_weights = 0.2 * np.random.random((num_dist_features, hidden1_size)) - 0.1
+        target_dist_weights = np.random.uniform(-high, high, ((num_dist_features, hidden1_size)))
         num_dist_features = word_window * pred_dist_table.shape[1]
-        pred_dist_weights = 0.2 * np.random.random((num_dist_features, hidden1_size)) - 0.1
+        pred_dist_weights = np.random.uniform(-high, high, ((num_dist_features, hidden1_size)))
         
         if hidden2_size > 0:
-            hidden2_weights = 0.2 * np.random.random((hidden2_size, hidden1_size)) - 0.1
-            hidden2_bias = 0.2 * np.random.random(hidden2_size) - 0.1          
+            hidden2_weights = np.random.uniform(-high, high, ((hidden2_size, hidden1_size)))
+            high = 2.38 / np.sqrt(hidden2_size) # [Bottou-88]
+            hidden2_bias = np.random.uniform(-high, high, (hidden2_size))          
             output_dim = (output_size, hidden2_size)
         else:
             hidden2_weights = None
             hidden2_bias = None
             output_dim = (output_size, hidden1_size)
 
-        output_weights = 0.2 * np.random.random(output_dim) - 0.1
-        output_bias = 0.2 * np.random.random(output_size) - 0.1
+        high = 2.38 / np.sqrt(output_dim) # [Bottou-88]
+        output_weights = np.random.uniform(-high, high, (output_dim))
+        high = 2.38 / np.sqrt(output_size) # [Bottou-88]
+        output_bias = np.random.uniform(-high, high, (output_size))
         
         net = ConvolutionalNetwork(word_window, input_size, hidden1_size, hidden2_size, 
                                    output_size, hidden_weights, hidden_bias, 
@@ -418,7 +423,8 @@ Output size: %d
                 
                 all_scores = self._calculate_all_scores(scores)
                 last_token = len(sentence) - 1
-                logadd = np.log(np.sum(np.exp(all_scores[last_token])))
+                #logadd = np.log(np.sum(np.exp(all_scores[last_token])))
+                logadd = logsumexp(all_scores[last_token])
                 confidence = self.answer_score - logadd
                 pred_answer = (pred_answer, confidence)
             
@@ -448,9 +454,10 @@ Output size: %d
         for i, tag_scores in enumerate(scores):
             tag = tags[i]
             
-            exponentials = np.exp(tag_scores)
-            exp_sum = np.sum(exponentials)
-            logadd = np.log(exp_sum)
+            # exponentials = np.exp(tag_scores)
+            # exp_sum = np.sum(exponentials)
+            # logadd = np.log(exp_sum)
+            logadd = logsumexp(tag_scores)
             
             # update the total error 
             error = logadd - tag_scores[tag]
@@ -464,7 +471,9 @@ Output size: %d
                 continue
             
             correction = True
-            self.net_gradients[i] = - exponentials / exp_sum
+            # self.net_gradients[i] = - exponentials / exp_sum
+            # negative gradient: will be added instead of subtracted
+            self.net_gradients[i] = - np.exp(tag_scores - logadd)
             self.net_gradients[i, tag] += 1
     
         return correction
@@ -677,7 +686,7 @@ Output size: %d
                 return best_scores
             
             # we must find the combination of tags that maximizes the probabilities
-            logadd = np.log(np.sum(np.exp(scores), 1))
+            logadd = logsumexp(scores, 1)
             logprobs = (scores.T - logadd).T
             counts = np.bincount(best_scores)
             
@@ -806,14 +815,7 @@ Output size: %d
         
         # first window
         cdef np.ndarray window = padded_sentence[:self.word_window_size]
-        cdef np.ndarray input_data
-        input_data = np.concatenate(
-                                    [table[index] 
-                                     for token_indices in window
-                                     for index, table in zip(token_indices, 
-                                                             self.feature_tables)
-                                     ]
-                                    )
+        cdef np.ndarray input_data = self.lookup(window)
         
         lookup[0] = self.hidden_weights.dot(input_data)
         if train:

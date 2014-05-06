@@ -10,28 +10,13 @@ primiraly at inducing word representations.
 
 import utils
 
-cdef class LanguageModel: 
+cdef class LanguageModel(Network): 
     
     # sizes and learning rates
-    cdef readonly int word_window_size, input_size, hidden_size
     cdef int half_window
-    cdef public float learning_rate 
-    cdef public float learning_rate_features
-    
-    # padding stuff
-    cdef public np.ndarray padding_left, padding_right
-    
-    # weights, biases, calculated values
-    cdef readonly np.ndarray hidden_weights, output_weights
-    cdef readonly np.ndarray hidden_bias, output_bias
-    cdef readonly np.ndarray input_values, hidden_values
-    
-    # feature_tables 
-    cdef public list feature_tables
     
     # data for statistics during training. 
-    cdef float error, accuracy
-    cdef int total_items, train_hits, skips
+    cdef int total_items
     
     # pool of random numbers (used for efficiency)
     cdef np.ndarray random_pool
@@ -50,11 +35,15 @@ cdef class LanguageModel:
         input_size *= word_window
         
         # creates the weight matrices
-        # all weights are between -0.1 and +0.1
-        hidden_weights = 0.2 * np.random.random((hidden_size, input_size)) - 0.1
-        hidden_bias = 0.2 * np.random.random(hidden_size) - 0.1
-        output_weights = 0.2 * np.random.random(hidden_size) - 0.1
-        output_bias = 0.2 * np.random.random(1) - 0.1
+        high = 2.38 / np.sqrt(input_size) # [Bottou-88]
+        #high = 0.1              # Fonseca
+        hidden_weights = np.random.uniform(-high, high, (hidden_size, input_size))
+        high = 2.38 / np.sqrt(hidden_size) # [Bottou-88]
+        #high = 0.1              # Fonseca
+        hidden_bias = np.random.uniform(-high, high, (hidden_size))
+        output_weights = np.random.uniform(-high, high, (hidden_size))
+        high = 0.1
+        output_bias = np.random.uniform(-high, high, (1))
         
         net = LanguageModel(word_window, input_size, hidden_size, 
                             hidden_weights, hidden_bias, output_weights, output_bias)
@@ -84,35 +73,6 @@ cdef class LanguageModel:
         self.output_bias = output_bias
         self.filename = ''      # Attardi
     
-    def run(self, np.ndarray indices):
-        """
-        Runs the network for a given input. 
-        
-        :param indices: a 2-dim np array of indices to the feature tables.
-            Each element must have the indices to each feature table.
-        """
-        # find the actual input values concatenating the feature vectors
-        # for each input token
-        cdef np.ndarray input_data
-        input_data = np.concatenate(
-                                    [table[index] 
-                                     for token_indices in indices
-                                     for index, table in zip(token_indices, 
-                                                             self.feature_tables)
-                                     ]
-                                    )
-        
-        # store the output in self in order to use in the backprop
-        self.input_values = input_data
-        self.hidden_values = self.hidden_weights.dot(input_data)
-        self.hidden_values += self.hidden_bias
-        self.hidden_values = np.tanh(self.hidden_values)
-        
-        cdef float output = self.output_weights.dot(self.hidden_values)
-        output += self.output_bias
-        
-        return output
-    
     def _generate_token(self):
         """
         Generates randomly a token to serve as a negative example.
@@ -131,7 +91,6 @@ cdef class LanguageModel:
         Trains the network with a pair of positive/negative examples.
         The negative one is randomly generated.
         """
-        cdef int start_from = 0
         cdef np.ndarray[INT_t, ndim=1] token
         cdef int i, j
         cdef np.ndarray[FLOAT_t, ndim=2] table
@@ -144,12 +103,12 @@ cdef class LanguageModel:
             if negative_token[0] != middle_token[0]:
                 break
         
-        pos_score = self.run(example)
+        pos_input_values = self.lookup(example)
+        pos_score = self.run(pos_input_values)
         pos_hidden_values = self.hidden_values
-        pos_input_values = self.input_values
         
         example[self.half_window] = negative_token
-        neg_score = self.run(example)
+        neg_score = self.run(self.lookup(example))
         
         # put the original token back
         example[self.half_window] = middle_token
@@ -166,8 +125,10 @@ cdef class LanguageModel:
         # (remember the network still has the values of the negative example) 
         
         # hidden gradients (the derivative of tanh(x) is 1 - tanh^2(x))
-        hidden_neg_grads = (1 - self.hidden_values ** 2) * (- self.output_weights)
-        hidden_pos_grads = (1 - pos_hidden_values ** 2) * self.output_weights
+        # hidden_neg_grads = (1 - self.hidden_values ** 2) * (- self.output_weights)
+        # hidden_pos_grads = (1 - pos_hidden_values ** 2) * self.output_weights
+        hidden_neg_grads = hardtanhd(self.hidden_values) * (- self.output_weights)
+        hidden_pos_grads = hardtanhd(pos_hidden_values) * self.output_weights
         
         # input gradients
         input_neg_grads = self.learning_rate_features * hidden_neg_grads.dot(self.hidden_weights)
@@ -178,17 +139,20 @@ cdef class LanguageModel:
         self.output_weights += self.learning_rate * (pos_hidden_values - self.hidden_values) 
         
         # hidden weights
-        grad_matrix = np.tile(hidden_neg_grads, [self.input_size, 1]).T
-        hidden_neg_deltas = grad_matrix * self.input_values
+        # grad_matrix = np.tile(hidden_neg_grads, (self.input_size, 1)).T
+        # hidden_neg_deltas = grad_matrix * self.input_values
+        hidden_neg_deltas = hidden_neg_grads.T.dot(self.input_values)
         
-        grad_matrix = np.tile(hidden_pos_grads, [self.input_size, 1]).T
-        hidden_pos_deltas = grad_matrix * pos_input_values
+        # grad_matrix = np.tile(hidden_pos_grads, (self.input_size, 1)).T
+        # hidden_pos_deltas = grad_matrix * pos_input_values
+        hidden_pos_deltas = hidden_pos_grads.T.dot(pos_input_values)
         
         self.hidden_weights += self.learning_rate * (hidden_neg_deltas + hidden_pos_deltas)
         self.hidden_bias += self.learning_rate * (hidden_neg_grads + hidden_pos_grads)
         
         # this tracks where the deltas for the next table begins
         # (used for efficiency reasons)
+        cdef int start_from = 0
              
         for i, token in enumerate(example):
             for j, table in enumerate(self.feature_tables):
@@ -350,8 +314,10 @@ Hidden layer size: %d
         epoch, including error and accuracy.
         """
         cdef float error = self.error / self.total_items
-        print "%d batches   Error:   %f   %d out of %d corrections could be skipped" % (num + 1,
-         error,
-         self.skips,
-         self.total_items)
+        logger = logging.getLogger("Logger")
+        logger.info("%d batches   Error:   %f   " \
+                    "%d out of %d corrections skipped" % (num + 1,
+                                                          error,
+                                                          self.skips,
+                                                          self.total_items))
 

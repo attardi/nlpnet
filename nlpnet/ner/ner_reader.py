@@ -23,6 +23,9 @@ def toIOBES(sent):
                 tok[1] = 'E'+tok[1][1:]
     return sent
 
+def noGazetteer(words):
+    return [0] * len(words)
+
 def create_extractor(dict):
     def present(words):
         # check presence in dictionary possibly as multiword
@@ -108,7 +111,10 @@ class NerReader(TaggerReader):
         super(NerReader, self).create_converter(metadata)
         inGazetteer = gazetteer(config.FILES[metadata.gazetteer])
         for c in metadata.gaz_classes:
-            self.converter.add_extractor(inGazetteer[c])
+            if c in inGazetteer:
+                self.converter.add_extractor(inGazetteer[c])
+            else:
+                self.converter.add_extractor(noGazetteer)
 
 class NerTagReader(NerReader):
     """
