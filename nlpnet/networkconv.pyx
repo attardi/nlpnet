@@ -421,7 +421,7 @@ Output size: %d
                 if self.only_classify:
                     raise NotImplementedError('Confidence measure not implemented for argument classifying')
                 
-                all_scores = self._calculate_all_scores(scores)
+                all_scores = self._calculate_delta(scores)
                 last_token = len(sentence) - 1
                 #logadd = np.log(np.sum(np.exp(all_scores[last_token])))
                 logadd = logsumexp(all_scores[last_token])
@@ -437,7 +437,7 @@ Output size: %d
         if self.only_classify:
             return self._calculate_gradients_classify(tags, scores)
         else:
-            return self._calculate_gradients_all_tokens(tags, scores)
+            return self._calculate_gradients_sll(tags, scores)
     
     def _calculate_gradients_classify(self, tags, scores):
         """
