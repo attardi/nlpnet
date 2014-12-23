@@ -10,8 +10,9 @@ import logging
 import numpy as np
 from collections import Counter
 
-import config
 import attributes
+import metadata
+import config
 from word_dictionary import WordDictionary
 from attributes import get_capitalizations
 
@@ -94,7 +95,7 @@ class TextReader(object):
         """
         new_sentences = []
         for sent in self.sentences:
-            new_sent = self.converter.convert_sentence(sent)
+            new_sent = self.converter.convert(sent)
             new_sentences.append(new_sent)
         
         self.sentences = new_sentences
@@ -214,3 +215,56 @@ class TaggerReader(TextReader):
             
         with open(filename, 'rb') as f:
             self.tag_dict = cPickle.load(f)
+
+class TweetReader(TextReader):
+    """
+    Reader for tweets in SemEval 2013 format, one tweet per line consisting  of:
+    SID	UID	polarity	tokenized text
+    264183816548130816      15140428        positive      Gas by my house hit $3.39!!!! I'm going to Chapel Hill on Sat. :)
+    """
+    
+    def __init__(self, size=1, filename=None, variant=None):
+        """
+	:param size: the lenght of ngrams to consider
+        :param filename: the name of the file containing tweets. The file should have one tweet per line.
+	:param variant: whether to use native, or SENNA or Polyglot conventions
+        """
+	self.size = size
+        self.variant = variant
+        self.sentences = []
+        self.polarities = []
+        with open(filename, 'rb') as f:
+            for line in f:
+                tweet = unicode(line, 'utf-8').split('\t')
+                self.sentences.append(tweet[3])
+                if tweet[2] == 'positive':
+                    polarity = 1
+                if tweet[2] == 'negative':
+                    polarity = -1
+                else:
+                    polarity = 0
+                self.polarities.append(polarity)
+                    
+        self.converter = None
+        self.task = 'sslm'
+    
+    def generate_dictionary(self, dict_size=None, minimum_occurrences=None):
+        """
+        Generates a ngram dictionary based on the given sentences.
+        
+        :param dict_size: Max number of tokens to be included in the dictionary.
+        :param minimum_occurrences: Minimum number of times that a token must
+            appear in the text in order to be included in the dictionary. 
+        """
+        logger = logging.getLogger("Logger")
+        logger.info("Creating dictionary...")
+        
+        tokens = [token for sent in self.sentences for token in sent]
+	for n in xrange(1, self.size + 1):
+	    for sent in self.sentences:
+                words = sent.split()
+	    	for i in xrange(len(words) + 1 - n):
+		    tokens.append(' '.join(words[i:i+n]))
+        self.word_dict = WordDictionary(tokens, dict_size, minimum_occurrences)
+            
+        logger.info("Done. Dictionary size is %d tokens" % self.word_dict.num_tokens)

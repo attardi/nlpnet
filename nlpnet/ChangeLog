@@ -1,4 +1,25 @@
+2014-12-23  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* metadata.py (Metadata.save_to_file): use file names from config.py
+
+	* config.py: added sslm portion.
+	Use consistent naming convenion of prefix task nae rather than postfix.
+
+	* reader.py (TextReader.codify_sentences): convert_sentences -> convert
+
+	* network.pyx (hardtanhe): derivative of hardtanh in terms of its
+	output.
+
+	* networklm.pyx (_train_pair): use hardtanhe instead of hardtanhd.
+
+2014-12-22  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* networklm.pyx (_new_random_pool): generate a simple list, not a
+	list of singletons.
+
 2014-05-06  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* utils.py (generate_feature_vectors): use random.uniform.
 
 	* network.pyx (_viterbi): fixed bug.
 

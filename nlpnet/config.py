@@ -24,31 +24,34 @@ def set_data_dir(directory):
          
          # Language Model
          'network_lm': os.path.join(data_dir, 'lm-network.npz'),
-         'metadata_lm': os.path.join(data_dir, 'metadata-lm.pickle'),
-         'type_features_lm': os.path.join(data_dir, 'types-features-lm.npy'),
-         'caps_features_lm': os.path.join(data_dir, 'caps-features-lm.npy'),
-         'suffix_features_lm': os.path.join(data_dir, 'suffix-features-lm.npy'),
+         'metadata_lm': os.path.join(data_dir, 'lm-metadata.pickle'),
+         'type_features_lm': os.path.join(data_dir, 'lm-embeddings.npy'),
+
+         # Sentiment Model
+         'network_sslm': os.path.join(data_dir, 'sslm-network.npz'),
+         'metadata_sslm': os.path.join(data_dir, 'sslm-metadata.pickle'),
+         'type_features_sslm': os.path.join(data_dir, 'sslm-embeddings.npy'),
          
          # POS
          'network_pos': os.path.join(data_dir, 'pos-network.npz'),
          'pos_tag_dict': os.path.join(data_dir, 'pos-tag-dict.pickle'),
          'suffixes': os.path.join(data_dir, 'suffixes.txt'),
-         'metadata_pos': os.path.join(data_dir, 'metadata-pos.pickle'),
-         'type_features_pos': os.path.join(data_dir, 'types-features-pos.npy'),
-         'caps_features_pos': os.path.join(data_dir, 'caps-features-pos.npy'),
-         'suffix_features_pos': os.path.join(data_dir, 'suffix-features-pos.npy'),
+         'metadata_pos': os.path.join(data_dir, 'pos-metadata.pickle'),
+         'type_features_pos': os.path.join(data_dir, 'pos-types-features.npy'),
+         'caps_features_pos': os.path.join(data_dir, 'pos-caps-features.npy'),
+         'suffix_features_pos': os.path.join(data_dir, 'pos-suffix-features.npy'),
 
          # NER
          'network_ner': os.path.join(data_dir, 'ner-network.npz'),
          'ner_tag_dict': os.path.join(data_dir, 'ner-tag-dict.pickle'),
-         'type_features_ner': os.path.join(data_dir, 'types-features-ner.npy'),
-         'caps_features_ner': os.path.join(data_dir, 'caps-features-ner.npy'),
-         'suffix_features_ner': os.path.join(data_dir, 'suffix-features-ner.npy'),
+         'type_features_ner': os.path.join(data_dir, 'ner-types-features.npy'),
+         'caps_features_ner': os.path.join(data_dir, 'ner-caps-features.npy'),
+         'suffix_features_ner': os.path.join(data_dir, 'ner-suffix-features.npy'),
          'gazetteer_ner': os.path.join(data_dir, 'eng.list'),
-         'gaz_features_ner': [os.path.join(data_dir, 'gazl-features-ner.npy'),
-                              os.path.join(data_dir, 'gazm-features-ner.npy'),
-                              os.path.join(data_dir, 'gazo-features-ner.npy'),
-                              os.path.join(data_dir, 'gazp-features-ner.npy')],
+         'gaz_features_ner': [os.path.join(data_dir, 'ner-gazl-features.npy'),
+                              os.path.join(data_dir, 'ner-gazm-features.npy'),
+                              os.path.join(data_dir, 'ner-gazo-features.npy'),
+                              os.path.join(data_dir, 'ner-gazp-features.npy')],
 
          # chunk
          'chunk_tag_dict': os.path.join(data_dir, 'chunk-tag-dict.pickle'),
@@ -79,10 +82,10 @@ def set_data_dir(directory):
          'type_features_srl_predicates': os.path.join(data_dir, 'types-features-preds.npy'),
          'caps_features_srl_predicates': os.path.join(data_dir, 'caps-features-preds.npy'),
          'pos_features_srl_predicates': os.path.join(data_dir, 'pos-features-preds.npy'),
-         'metadata_srl': os.path.join(data_dir, 'metadata-srl.pickle'),
-         'metadata_srl_boundary': os.path.join(data_dir, 'metadata-srl-boundary.pickle'),
-         'metadata_srl_classify': os.path.join(data_dir, 'metadata-srl-classify.pickle'),
-         'metadata_srl_predicates': os.path.join(data_dir, 'metadata-srl-predicates.pickle'),
+         'metadata_srl': os.path.join(data_dir, 'srl-metadata.pickle'),
+         'metadata_srl_boundary': os.path.join(data_dir, 'srl-metadata-boundary.pickle'),
+         'metadata_srl_classify': os.path.join(data_dir, 'srl-metadata-classify.pickle'),
+         'metadata_srl_predicates': os.path.join(data_dir, 'srl-metadata-predicates.pickle'),
          'srl_gold': os.path.join(data_dir, 'srl-gold.txt')
          }
 

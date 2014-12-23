@@ -189,10 +189,12 @@ def contract(w1, w2):
 def generate_feature_vectors(num_vectors, num_features, min_value=-0.1, max_value=0.1):
     """
     Generates vectors of real numbers, to be used as word features.
-    Vectors are initialized randomly. Returns a 2-dim numpy array.
+    Vectors are initialized randomly with values in the interval [min_value, max_value]
+    :return: a 2-dim numpy array.
     """
     logger = logging.getLogger("Logger")
-    table = (max_value * 2) * np.random.random((num_vectors, num_features)) + min_value
+    table = np.random.uniform(min_value, max_value, (num_vectors, num_features))
+    #table.fill(0.1)                 # debug
     logger.debug("Generated %d feature vectors with %d features each." % (num_vectors,
                                                                           num_features))
     
@@ -224,6 +226,8 @@ def load_features(args, md, text_reader):
     logger = logging.getLogger("Logger")
     feature_tables = []
     
+    #np.set_printoptions(threshold='nan') # debug
+    np.random.seed(1) # debug (for replicability)
     if not args.load_types:
         logger.info("Generating word type features...")
         table_size = len(text_reader.word_dict)
@@ -261,6 +265,7 @@ def load_features(args, md, text_reader):
         else:
             logger.info("Generating capitalization features...")
             caps_table = generate_feature_vectors(attributes.Caps.num_values, args.caps)
+            # print "ct", caps_table
         
         feature_tables.append(caps_table)
     
@@ -273,6 +278,7 @@ def load_features(args, md, text_reader):
             logger.info("Generating suffix features...")
             suffix_table = generate_feature_vectors(attributes.Suffix.num_suffixes,
                                                     args.suffix)
+            # print "st", suffix_table
         feature_tables.append(suffix_table)
     
     # POS tags

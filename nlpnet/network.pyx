@@ -16,7 +16,6 @@ import logging
 
 ctypedef np.float_t FLOAT_t
 ctypedef np.int_t INT_t
-#ctypedef np.longdouble_t DOUBLE_t
 ctypedef np.double_t DOUBLE_t
 
 # ----------------------------------------------------------------------
@@ -66,11 +65,11 @@ cdef logsumexp(np.ndarray a, axis=None):
     a_max = a.max(axis=0)
     return np.log(np.sum(np.exp(a - a_max), axis=0)) + a_max
 
-cdef hardtanh(np.ndarray[FLOAT_t, ndim=1] weights):
+cdef hardtanh(np.ndarray[DOUBLE_t, ndim=1] weights):
     """Hard hyperbolic tangent."""
     cdef np.ndarray out = np.empty_like(weights)
     cdef int i
-    cdef float w
+    cdef double w
     for i, w in enumerate(weights):
         if w < -1:
             out[i] = -1
@@ -80,14 +79,24 @@ cdef hardtanh(np.ndarray[FLOAT_t, ndim=1] weights):
             out[i] = w
     return out
 
-cdef hardtanhd(np.ndarray[FLOAT_t, ndim=2] weights):
+cdef hardtanhd(np.ndarray[DOUBLE_t, ndim=2] weights):
     """derivative of hardtanh"""
     cdef np.ndarray out = np.zeros_like(weights)
     cdef int i
-    cdef float w
+    cdef double w
     for i, w in enumerate(weights.flat):
         if -1.0 <= w <= 1.0:
             out.flat[i] = 1.0
+    return out
+
+cdef hardtanhe(np.ndarray[DOUBLE_t, ndim=2] y):
+    """derivative of hardtanh in terms of y = hardtanh(x) ="""
+    cdef np.ndarray out = np.ones_like(y)
+    cdef int i
+    cdef double w
+    for i, w in enumerate(y.flat):
+        if  w == -1.0 or w == 1.0:
+            out.flat[i] = 0.0
     return out
 
 # ----------------------------------------------------------------------
@@ -141,7 +150,7 @@ cdef class Network:
         # creates the weight matrices
 
         # set the seed for replicability
-        #np.random.seed(42)
+        #np.random.seed(1)
 
 	# SENNA: centered uniform distribution with variance = 1/sqrt(fanin)
 	# variance = 1/12 interval ^ 2
@@ -156,7 +165,7 @@ cdef class Network:
         #high = 0.1              # Fonseca
         output_weights = np.random.uniform(-high, high, (output_size, hidden_size))
         output_bias = np.random.uniform(-high, high, (output_size))
-        
+
         high = 1.0
         # +1 is due for the initial transition
         transitions = np.random.uniform(-high, high, (output_size + 1, output_size))
@@ -173,10 +182,10 @@ cdef class Network:
                  transitions=None):
         """
         This function isn't expected to be directly called.
-        Instead, use the classmethods load_from_file or 
-        create_new.
+        Instead, use the classmethods load_from_file or create_new.
+
         :param transitions: transition weights. If None uses
-        Window Level Likelihood instead of Sentence Level Likelihood.
+            Window Level Likelihood instead of Sentence Level Likelihood.
         """
         self.learning_rate = 0
         self.learning_rate_features = 0
@@ -220,6 +229,8 @@ Output size: %d
         for each input token.
         :param indices: a 2-dim np array of indices into the feature tables.
             Each row represents a token through its indices into each feature table.
+	:return: a list of feature vectors, each one combining the vectors of
+        the corresponding features in :param indices:
         """
         return np.concatenate([table[index] 
                                for token_indices in indices
@@ -338,7 +349,7 @@ Output size: %d
         transitions = self.transitions[:-1] # A_i,k
         for token in xrange(1, len(delta)):
             # add and sum by columns
-            #logadd = np.log(np.sum(np.exp(delta[token - 1] + transitions.T), 1))
+            #logadd = np.log(np.sum(np.exp(delta[token - 1] + transitions), 1))
             logadd = logsumexp(delta[token - 1][:,np.newaxis] + transitions, 0)
             delta[token] += logadd
             
@@ -369,6 +380,7 @@ Output size: %d
         
         # delta[t] = delta_t in equation (14)
         delta = self._calculate_delta(scores)
+
         # logadd_i(delta_T(i)) = log(Sum_i(exp(delta_T(i))))
         # Sentence-level Log-Likelihood (SLL)
         # C(ftheta,A) = logadd_j(s(x, j, theta, A)) - score(correct path)
@@ -390,7 +402,7 @@ Output size: %d
         # dC / dftheta
         self.net_gradients = np.zeros((len(tags), self.output_size))
         # dC / dA
-        self.trans_gradients = np.zeros_like(self.transitions, np.float)
+        self.trans_gradients = np.zeros_like(self.transitions, np.double)
         
         # things get nasty from here
         # refer to the papers to understand what exactly is going on
@@ -483,7 +495,7 @@ Output size: %d
         return True
 
     @cython.boundscheck(False)
-    def _viterbi(self, np.ndarray[FLOAT_t, ndim=2] scores):
+    def _viterbi(self, np.ndarray[DOUBLE_t, ndim=2] scores):
         """
         Performs a Viterbi search over the scores for each tag using
         the transitions matrix. If a matrix wasn't supplied, 
@@ -492,7 +504,7 @@ Output size: %d
         # pretty straightforward
         if self.transitions is None or len(scores) == 1:
             return scores.argmax(1)
-            
+
         path_scores = np.empty_like(scores)
         path_backtrack = np.empty_like(scores, np.int)
         
@@ -502,7 +514,7 @@ Output size: %d
         path_scores[0] = scores[0] + self.transitions[-1]
         
         output_range = np.arange(self.output_size) # outside loop
-        transitions = self.transitions[:-1]        # outside loop
+        transitions = self.transitions[:-1]        # idem
 
         cdef int i
         for i in xrange(1, len(scores)):
@@ -586,13 +598,13 @@ Output size: %d
         epoch, including error and accuracy.
         """
         logger = logging.getLogger("Logger")
-        logger.info("%d epochs   Error: %f   Accuracy: %f   " \
-            "%d corrections skipped" % (num,
-                                        self.error,
-                                        self.accuracy,
-                                        self.skips))
+        msg = ""
+        if self.skips:
+            msg = "   %d corrections skipped" % self.skips
         if self.float_errors:
-            logger.info("%d floating point errors", self.float_errors)
+            msg += "   %d floating point errors" % self.float_errors
+        logger.info("%d epochs   Error: %f   Accuracy: %f%s" \
+                        % (num, self.error, self.accuracy, msg))
     
     def _train_epoch(self, list sentences, list tags):
         """
@@ -612,7 +624,7 @@ Output size: %d
         np.random.shuffle(tags)
         
         # keep last 2% for validation
-        validation = int(len(sentences) * 0.98)
+        validation = int((len(sentences) - 1) * 0.98) + 1 # at least 1
 
         i = 0
         for sent, sent_tags in izip(sentences, tags):
@@ -641,15 +653,18 @@ Output size: %d
                 if pred_tag == gold_tag:
                     hits += 1
                 tokens += 1
-        self.accuracy = float(hits) / tokens
+        if tokens:
+            self.accuracy = float(hits) / tokens
+        else:
+            self.accuracy = 0.0
 
     def _backpropagate(self, sentence):
         """
         Backpropagate the gradients of the cost.
         """
         # f_1 = input_sent_values
-        # f_2 = M_1 f_1 + b_2 = layer2_values
-        # f_3 = hardTanh(f_2) = hidden_values
+        # f_2 = M_1 f_1 + b_2 = layer2_sent_values
+        # f_3 = hardTanh(f_2) = hidden_sent_values
         # f_4 = M_2 f_3 + b_4
 
         # For l = 4..1 do:
@@ -662,7 +677,7 @@ Output size: %d
         # layer 4: output layer
         # dC / dW_4 = dC / df_4 f_3.T				(22)
         # (len, output_size).T (len, hidden_size) = (output_size, hidden_size)
-        cdef np.ndarray[FLOAT_t, ndim=2] output_gradients
+        cdef np.ndarray[DOUBLE_t, ndim=2] output_gradients
         output_gradients = self.net_gradients.T.dot(self.hidden_sent_values)
 
         # dC / db_4 = dC / df_4					(22)
@@ -686,16 +701,16 @@ Output size: %d
 
         # layer 2: linear layer
         # dC / dW_2 = dC / df_2 f_1.T				(22)
-        cdef np.ndarray[FLOAT_t, ndim=2] hidden_gradients
+        cdef np.ndarray[DOUBLE_t, ndim=2] hidden_gradients
         # (len, hidden_size).T (len, input_size) = (hidden_size, input_size)
         hidden_gradients = dCdf_2.T.dot(self.input_sent_values)
 
-        # dC / db_2 = dC / df_2					(22)
+        # dC / db_1 = dC / df_2					(22)
         # sum by column contribution by each token
         hidden_bias_gradients = dCdf_2.sum(0)
 
         # dC / df_1 = M_1.T dC / df_2
-        cdef np.ndarray[FLOAT_t, ndim=2] input_gradients
+        cdef np.ndarray[DOUBLE_t, ndim=2] input_gradients
         # (len, hidden_size) (hidden_size, input_size) = (len, input_size)
         input_gradients = dCdf_2.dot(self.hidden_weights)
 
@@ -714,7 +729,7 @@ Output size: %d
         # they are in the same sequence as the network receives them, i.e.
         # [token1-table1][token1-table2][token2-table1][token2-table2] (...)
         # input_size = num features * window (e.g. 60 * 5). Attardi
-        cdef np.ndarray[FLOAT_t, ndim=2] input_deltas
+        cdef np.ndarray[DOUBLE_t, ndim=2] input_deltas
         # (len, input_size)
         input_deltas = input_gradients * self.learning_rate_features
         
@@ -723,9 +738,9 @@ Output size: %d
                                           self.pos_padding))
         
         cdef np.ndarray[INT_t, ndim=1] features
-        cdef np.ndarray[FLOAT_t, ndim=2] table
+        cdef np.ndarray[DOUBLE_t, ndim=2] table
         cdef int start, end, t
-        cdef int i, j
+        cdef int i
 
         for i, w_deltas in enumerate(input_deltas):
             # for each window (w_deltas: 300, features: 5)
@@ -796,4 +811,5 @@ Output size: %d
 # this comes here after the Network class has already been defined
 include "networkconv.pyx"
 include "networklm.pyx"
+include "networkSent.pyx"
 

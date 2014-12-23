@@ -8,7 +8,7 @@ These arguments used by the training script.
 import argparse
 
 # Tasks performed: part-of-speech tagging, semantic role labeling, language modeling and NER
-TASKS = set(['pos', 'srl', 'lm', 'ner'])
+TASKS = set(['pos', 'srl', 'lm', 'ner', 'sslm'])
 
 def get_args():
     parser = argparse.ArgumentParser(description="Trains a neural\
@@ -19,10 +19,10 @@ def get_args():
     parser.add_argument('--gold', help='File with annotated data for training.', type=str, default=None, required=True)
     parser.add_argument('--data', help='Directory to save new models and load partially trained ones', type=str, default=None, required=True)
     parser.add_argument('-w', '--window', type=int,
-                        help='Size of the word window',
+                        help='Size of the word window (default 5)',
                         default=5, dest='window')
     parser.add_argument('-f', '--num_features', type=int,
-                        help='Number of features per word',
+                        help='Number of features per word (default 50)',
                         default=50, dest='num_features')
     parser.add_argument('--load_features', action='store_true',
                         help="Load previously saved word type features (overrides -f and must also \
@@ -54,8 +54,8 @@ def get_args():
     parser.add_argument('-a', '--accuracy', type=float,
                         help='Desired accuracy per tag.',
                         default=0, dest='accuracy')
-    parser.add_argument('-n', '--hidden', type=int, default=0,
-                        help='Number of hidden neurons',
+    parser.add_argument('-n', '--hidden', type=int, default=200,
+                        help='Number of hidden neurons (default 200)',
                         dest='hidden')
     parser.add_argument('-c', '--convolution', type=int, default=0,
                         help='Number of convolution neurons',
@@ -79,6 +79,11 @@ def get_args():
     parser.add_argument('--semi', help='Perform semi-supervised training. Supply the name of the file with automatically tagged data.',
                         type=str, default='')
     parser.add_argument('--variant', help='If "polyglot" use Polyglot case conventions; if "senna" use SENNA conventions.', type=str, default=None)
+    parser.add_argument('--dict_size',type=int, default=100000,
+                        help='Size of embeddings dictionary (default 100000)')
+    parser.add_argument('--alpha', type=float, default=0.5,
+                        help='Weight of sntactic loss (default 0.5)',
+                        dest='alpha')
     
     args = parser.parse_args()
     

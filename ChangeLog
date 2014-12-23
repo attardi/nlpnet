@@ -1,3 +1,8 @@
+2014-12-20  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* nlpnet/networkSent.pyx: network for sentiment-specific word
+	embeddings.
+
 2014-04-22  Giuseppe Attardi  <attardi@di.unipi.it>
 
 	* bin/nlpnet-train.py (saver): use random.seed() if you want to

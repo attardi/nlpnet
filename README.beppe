@@ -44,3 +44,14 @@ where tag_sentence() calls run(window indices), which creates the input data by:
 
 feature_tables for discrete features are generated randomly by generate_feature_vectors in utils.py.
 E.g. for Caps is a 4x5 table that maps each Caps feature to a 5-vector.
+
+## ----------------------------------------------------------------------
+
+Per rendere replicabili i risultati:
+
+- network.pyx
+  use fill(0.1) to initialize weights
+  don't shuffle sentences
+- utils.py
+  use fill(0.1) to initialize weights
+- use same list of postags.list

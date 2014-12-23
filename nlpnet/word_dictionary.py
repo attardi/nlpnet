@@ -38,11 +38,13 @@ class WordDictionary(dict):
         :param variant: either 'polyglot' or 'senna' conventions, i.e. keep upper case, use different padding tokens.
         """
         self.variant = variant
-        if variant == 'polyglot':
+        if variant:
+            self.variant = variant.lower()
+        if self.variant == 'polyglot':
             WordDictionary.padding_left = '<PAD>'
             WordDictionary.padding_right = '<PAD>'
             WordDictionary.rare = '<UNK>'
-        elif variant == 'senna':
+        elif self.variant == 'senna':
             WordDictionary.padding_left = 'PADDING'
             WordDictionary.padding_right = 'PADDING'
             WordDictionary.rare = 'UNKNOWN'

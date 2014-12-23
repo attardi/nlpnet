@@ -15,7 +15,7 @@ Specific configuration parameters are provided in the file ``nlpnet/config.py``.
 
 The script is invoked as follows::
 
- usage: nlpnet-train.py [-h] --task {lm,ner,pos,srl} --gold GOLD --data DATA
+ usage: nlpnet-train.py [-h] --task {lm,ner,pos,srl,sslm} --gold GOLD --data DATA
                        [-w WINDOW] [-f NUM_FEATURES] [--load_features]
                        [-e ITERATIONS] [-l LEARNING_RATE]
                        [--lf LEARNING_RATE_FEATURES]
@@ -30,7 +30,7 @@ The script is invoked as follows::
 
  optional arguments:
   -h, --help            show this help message and exit
-  --task {lm,ner,pos,srl}
+  --task {lm,ner,pos,srl,sslm}
                         Task for which the network should be used.
   --gold GOLD           File with annotated data for training.
   --data DATA           Directory to save new models and load partially

@@ -28,9 +28,9 @@ setup(
                  'bin/nlpnet-test.py',
                  'bin/nlpnet-preproc.py'],
       license = 'MIT',
-      version = '1.0.4',
-      author = 'Erick Fonseca',
-      author_email = 'erickrfonseca@gmail.com',
-      url = 'http://nilc.icmc.usp.br/nlpnet',
+      version = '1.1.6',
+      author = 'Giuseppe Attardi <attardi@di.unipi.it>, Erick Fonseca <erickrfonseca@gmail.com>',
+      author_email = 'attardi@di.unipi.it',
+      url = 'https://github.com/attardi/nlpnet',
       long_description = readme()
       )
