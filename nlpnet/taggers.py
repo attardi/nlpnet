@@ -16,7 +16,7 @@ from metadata import Metadata
 from pos.pos_reader import POSReader
 from srl.srl_reader import SRLReader
 from ner.ner_reader import NerReader, NerTagReader
-from network import Network, ConvolutionalNetwork, LanguageModel
+from network import Network, ConvolutionalNetwork
 
 def load_network(md):
     """
@@ -28,31 +28,34 @@ def load_network(md):
     logger.info('Loading network')
     if is_srl:
         net_class = ConvolutionalNetwork
-    elif md.task == 'lm':
-        net_class = LanguageModel
     else:
         net_class = Network
-    nn = net_class.load_from_file(config.FILES[md.network])
+    nn = net_class.load_from_file(md.paths[md.network])
     
-    logger.info('Loading features')
-    type_features = utils.load_features_from_file(config.FILES[md.type_features])
+    logger.info('Loading features...')
+    type_features = utils.load_features_from_file(md.paths[md.type_features])
     tables = [type_features]
     
     if md.use_caps:
-        caps_features = utils.load_features_from_file(config.FILES[md.caps_features])
+        caps_features = utils.load_features_from_file(md.paths[md.caps_features])
         tables.append(caps_features)
+    if md.use_prefix:
+        prefix_features = utils.load_features_from_file(md.paths[md.prefix_features])
+        for table in prefix_features:
+            # one table for each size
+            tables.append(table)
     if md.use_suffix:
-        suffix_features = utils.load_features_from_file(config.FILES[md.suffix_features])
+        suffix_features = utils.load_features_from_file(md.paths[md.suffix_features])
         tables.append(suffix_features)
     if md.use_pos:
-        pos_features = utils.load_features_from_file(config.FILES[md.pos_features])
+        pos_features = utils.load_features_from_file(md.paths[md.pos_features])
         tables.append(pos_features)
     if md.use_chunk:
-        chunk_features = utils.load_features_from_file(config.FILES[md.chunk_features])
+        chunk_features = utils.load_features_from_file(md.paths[md.chunk_features])
         tables.append(chunk_features)
     # NER gazetteers
     if md.use_gazetteer:
-        for gaz_file in config.FILES[md.gaz_features]:
+        for gaz_file in md.paths[md.gaz_features]:
             features = utils.load_features_from_file(gaz_file)
             tables.append(features)
 
@@ -65,12 +68,15 @@ def load_network(md):
 def create_reader(md, gold_file=None, tagging=False):
     """
     Creates a TextReader object for the given task and loads its dictionary.
+    :param md: a metadata object describing the task
+    :param gold_file: path to a file with gold standard data, if
+        the reader will be used for testing.
     """
     logger = logging.getLogger('Logger')
     logger.info('Loading text reader...')
     
     if md.task == 'pos':
-        tr = POSReader(filename=gold_file)
+        tr = POSReader(md, filename=gold_file)
         tr.load_tag_dict()
 
     elif md.task == 'ner':
@@ -82,7 +88,7 @@ def create_reader(md, gold_file=None, tagging=False):
         tr.load_tag_dict()
 
     elif md.task.startswith('srl'):
-        tr = SRLReader(filename=gold_file, only_boundaries= (md.task == 'srl_boundary'),
+        tr = SRLReader(md, filename=gold_file, only_boundaries= (md.task == 'srl_boundary'),
                        only_classify= (md.task == 'srl_classify'), 
                        only_predicates= (md.task == 'srl_predicates'))
             

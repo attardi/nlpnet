@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import itertools
-from collections import Counter
+from collections import Counter, OrderedDict as OD
 
 import re
 
@@ -18,9 +18,9 @@ class WordDictionary(dict):
     maps rare words to a special index.
     """
     
-    padding_left = '*LEFT*'
-    padding_right = '*RIGHT*'
-    rare = '*RARE*'
+    padding_left = 'PADDING'
+    padding_right = 'PADDING'
+    rare = 'UNKNOWN'
     
     def __init__(self, tokens, size=None, minimum_occurrences=None, wordlist=None, variant=None):
         """
@@ -34,7 +34,7 @@ class WordDictionary(dict):
         :param minimum_occurrences: The minimum number of occurrences a token must 
             have in order to be included.
         :param wordlist: Use this list of words to build the dictionary. Overrides tokens
-            if not None.
+            if not None and ignores maximum size.
         :param variant: either 'polyglot' or 'senna' conventions, i.e. keep upper case, use different padding tokens.
         """
         self.variant = variant
@@ -44,10 +44,6 @@ class WordDictionary(dict):
             WordDictionary.padding_left = '<PAD>'
             WordDictionary.padding_right = '<PAD>'
             WordDictionary.rare = '<UNK>'
-        elif self.variant == 'senna':
-            WordDictionary.padding_left = 'PADDING'
-            WordDictionary.padding_right = 'PADDING'
-            WordDictionary.rare = 'UNKNOWN'
             
         if wordlist is None:
             # work with the supplied tokens. extract frequencies.
@@ -60,45 +56,44 @@ class WordDictionary(dict):
             
             words = [key for key, number in c.most_common() 
                      if number >= minimum_occurrences]
+            
+            if size is not None and size < len(words):
+                words = words[:size]
         
         else:
-            # using supplied wordlist
-            words = list(wordlist) 
+            # using ordered dict as an ordered set
+            # (we need to keep the order and to eliminate duplicates)
+            if variant == 'polyglot':
+                words = [word for word in wordlist]
+            else:
+                words = [word.lower() for word in wordlist]
+            values = [None] * len(words)
+            words = OD(zip(words, values)).keys()
             
-        # verifies the maximum size
+        # trim to the maximum size
         if size is None:
             size = len(words)
         else:
             size = min(size, len(words))
             words = words[:size]
         
-        # set all words in the dictionary
+        # build the indexes
+        self.index = [0] * len(words) # inverse index
         for num, word in enumerate(words):
-            self[word] = num    # keep case. Attardi
+            self[word] = num    # keep original form. Attardi
+            self.index[num] = word
         
-        # if the given words include the rare symbol, don't replace it
-        if WordDictionary.rare in words:
-            self.num_tokens = size - 1
-            
-            # using dict.get() instead of [] because we override the latter
-            key = WordDictionary.rare # keep case. Attardi
-            self.index_rare = super(WordDictionary, self).get(key)
-        else:
-            self.num_tokens = size
-            self.index_rare = size
-            self[WordDictionary.rare] = self.index_rare
+        # if the given words include one of the the rare or padding symbols, don't replace it
+        special_symbols = [WordDictionary.rare, 
+                           WordDictionary.padding_left,
+                           WordDictionary.padding_right]
         
-        if WordDictionary.padding_left in words:
-            # keep case: both padding and PADDING are present in SENNA
-            self.index_padding_left = super(WordDictionary, self).get(WordDictionary.padding_left)
-        else:
-            self.index_padding_left = self.num_tokens + 1
-            self[WordDictionary.padding_left] = self.index_padding_left
-        if WordDictionary.padding_right in words:
-            self.index_padding_right = super(WordDictionary, self).get(WordDictionary.padding_right)
-        else:
-            self.index_padding_right = self.num_tokens + 2
-            self[WordDictionary.padding_right] = self.index_padding_right
+        for symbol in special_symbols:
+            if not super(WordDictionary, self).get(symbol, False):
+                self[symbol] = size
+                size += 1
+        
+        self.check()
     
     @classmethod
     def init_from_wordlist(cls, wordlist):
@@ -114,6 +109,17 @@ class WordDictionary(dict):
         Initializes an empty Word Dictionary.
         """
         return cls([[]])
+    
+    def save(self, filename):
+        """
+        Saves the word dictionary to the given file as a list of word types.
+        
+        Special words (paddings and rare) are also included.
+        """
+        sorted_words = sorted(self, key=self.get)
+        with open(filename, 'wb') as f:
+            for word in sorted_words:
+                print >> f, word.encode('utf-8')
     
     def _get_frequency_count(self, token_list):
         """
@@ -165,7 +171,7 @@ class WordDictionary(dict):
         # Attardi, faster variant
         new_tokens = [token for token in freqs 
                       if token not in self and freqs[token] >= minimum_occurrences]
-        # order the types from the most frequent to the least
+        # order the words from the most frequent to the least
         new_tokens.sort(key=lambda x: freqs[x], reverse=True)
         
         next_value = len(self)
@@ -185,9 +191,7 @@ class WordDictionary(dict):
         # deal with symbols in original case, e.g. PADDING, UNKNOWN. Attardi
         if super(WordDictionary, self).__contains__(key):
             return True
-        if self.variant == 'polyglot':
-            pass
-        elif self.variant == 'senna':
+        if self.variant != 'polyglot':
             # senna converts numbers to '0'
             if isNumber(key):
                 key = '0'
@@ -195,26 +199,32 @@ class WordDictionary(dict):
                 key = key.lower()
                 # replace all digits by '0'
                 re.sub('[0-9]', '0', key)
-        else:
-            key = key.lower()
         return super(WordDictionary, self).__contains__(key)
     
+    # We keep the case.
+    # def __setitem__(self, key, value):
+    #     """
+    #     Overrides the [] write operator. It converts every key to lower case
+    #     before assignment.
+    #     """
+    #     super(WordDictionary, self).__setitem__(key.lower(), value)
+
     # Keep case: 'padding' and 'PADDING' must remain different. Attardi
     def __getitem__(self, key):
         """
         Overrides the [] read operator. 
         
         Two differences from the original:
-        1) when given a word without an entry, it returns the value for the *RARE* key.
-        2) all entries are converted to lower case before verification (except when variant is 'polyglot').
+        1) when given a word without an entry, it returns the value for the
+           UNKNOWN* key.
+        2) entries are converted, replacing digits with 0 and lower casing
+           before access (except when variant is 'polyglot').
         """
         # deal with symbols in original case, e.g. PADDING, UNKNOWN. Attardi
         idx = super(WordDictionary, self).get(key)
         if idx:
             return idx
-        if self.variant == 'polyglot':
-            pass
-        elif self.variant == 'senna':
+        if self.variant != 'polyglot':
             # senna converts numbers to '0'
             if isNumber(key):
                 key = '0'
@@ -222,51 +232,49 @@ class WordDictionary(dict):
                 key = key.lower()
                 # replace all digits by '0'
                 re.sub('[0-9]', '0', key)
-        else:
-            key = key.lower()
         return super(WordDictionary, self).get(key, self.index_rare)
     
     def get(self, key):
         """
-        Overrides the dictionary get method, so when given a word without an entry, it returns 
-        the value for the *RARE* key. Note that it is not possible to supply a default value as 
-        in the dict class.
+        Overrides the dictionary get method, so when given a word without
+        an entry, it returns the value for the UNKNOWN key.
+        Note that it is NOT possible to supply a default value as in the dict class.
         """
         return self.__getitem__(key)
         
     def check(self):
         """
-        Checks the internal structure of the dictionary and makes necessary adjustments, 
-        such as updating num_tokens.
+        Checks the internal structure of the dictionary and makes necessary
+        adjustments, such as updating num_tokens.
         """
 
         # must repeat, since it is called in reader.load_dictionary()
-        # after reloading with pickle. Attardi
+        # after reloading from dump. Attardi
+        # FIXME: still needed?
         if self.variant == 'polyglot':
             WordDictionary.padding_left = '<PAD>'
             WordDictionary.padding_right = '<PAD>'
             WordDictionary.rare = '<UNK>'
-        elif self.variant == 'senna':
-            WordDictionary.padding_left = 'PADDING'
-            WordDictionary.padding_right = 'PADDING'
-            WordDictionary.rare = 'UNKNOWN'
 
         # Keep case for special tokens. Attardi
         self.index_padding_left = super(WordDictionary, self).get(WordDictionary.padding_left)
         self.index_padding_right = super(WordDictionary, self).get(WordDictionary.padding_right)
         self.index_rare = super(WordDictionary, self).get(WordDictionary.rare)
-        # Polyglot and Senna have single padding token
+        # Polyglot and Senna have two special tokens
         if self.index_padding_left == self.index_padding_right:
             self.num_tokens = len(self) - 2
         else:
             self.num_tokens = len(self) - 3
-    
+        
     def get_words(self, indices):
         """
         Returns the words represented by a sequence of indices.
+        Notice that this might not return the original sentence,
+        since the index is not injective: two words might have the same index
+        e.g. numbers '11' and '22' are mapped to '00'
+
         """
-        # FIXME: very inefficient
-        words = [w for w in self if self[w] in indices]
+        words = [self.index[i] for i in indices]
         return words
     
     def get_indices(self, words):
@@ -275,3 +283,23 @@ class WordDictionary(dict):
         """
         indices = [self[w] for w in words]
         return indices
+
+class NgramDictionary(WordDictionary):
+    """
+    Class to store ngrams and their corresponding indices in
+    the network lookup table.
+    """
+    def __init__(self, ngrams, size=None, minimum_occurrences=None, variant=None):
+        """
+        Fills a dictionary (to be used for indexing) with the most
+        common ngrams.
+        
+        :param ngrams: a list of lists of ngrams
+        :param size: Maximum number of ngram indices 
+            (not including paddings, rare, etc.).
+        :param minimum_occurrences: The minimum number of occurrences an ngram must 
+            have in order to be included.
+        :param variant: either 'polyglot' or 'senna' conventions, i.e. keep upper case, use different padding tokens.
+        """
+        WordDictionary.__init__(self, ngrams, size, minimum_occurrences,
+                                 variant=variant)

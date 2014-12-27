@@ -7,6 +7,7 @@ from collections import Counter
 
 import config
 from word_dictionary import WordDictionary as WD
+from collections import defaultdict
 
 class Caps(object):
     """Dummy class for storing numeric values for capitalization."""
@@ -56,7 +57,7 @@ class Suffix(object):
     suffix_size = 2
 
     @classmethod
-    def load_suffixes(cls):
+    def load_suffixes(cls, md):
         """
         loads the listed suffixes from the suffix file.
         """
@@ -64,7 +65,7 @@ class Suffix(object):
         code = Suffix.other + 1
         logger = logging.getLogger("Logger")
         try:
-            with open(config.FILES['suffixes'], 'rb') as f:
+            with open(md.paths['suffixes'], 'rb') as f:
                 for line in f:
                     suffix = unicode(line.strip(), 'utf-8')
                     Suffix.codes[suffix] = code
@@ -75,6 +76,42 @@ class Suffix(object):
             raise
         Suffix.num_suffixes = code
     
+    @classmethod
+    def load_prefixes(cls, md):
+        """
+        Loads prefixes from the prefix file.
+        """
+        cls.load_affixes(cls.prefix_codes, md.paths['prefixes'])
+        
+        # +1 because of the unkown prefix code
+        cls.num_prefixes_per_size = {size: len(cls.prefix_codes[size]) + 1
+                                     for size in cls.prefix_codes}
+    @classmethod
+    def load_affixes(cls, codes, filename):
+        """
+        Parent function for loading prefixes and suffixes.
+        """
+        logger = logging.getLogger("Logger")
+        
+        # intermediate storage
+        affixes_by_size = defaultdict(list)
+        
+        try:
+            with open(filename, 'rb') as f:
+                for line in f:
+                    affix = unicode(line.strip(), 'utf-8')
+                    size = len(affix)
+                    affixes_by_size[size].append(affix)
+        except IOError:
+            logger.error("File %s doesn't exist." % filename)
+            raise
+        
+        for size in affixes_by_size:
+            # for each size, each affix has a code starting from 1
+            # 0 is reserved for unknown affixes
+            codes[size] = {affix: code 
+                           for code, affix in enumerate(affixes_by_size[size], 1)}
+
     @classmethod
     def create_suffix_list(cls, wordlist, num, size, min_occurrences):
         """
@@ -167,7 +204,7 @@ class TokenConverter(object):
         """
         Converts a sentence into a 2-d array of feature indices.
         """
-        indices = np.array(zip(*[function(sent) for function in self.extractors]))
+        indices = np.array(zip(*[extractor(sent) for extractor in self.extractors]))
         return indices
 
 # capitalization

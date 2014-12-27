@@ -1,16 +1,15 @@
 # -*- coding: utf-8 -*-
 
-"""
-A neural network for the language modeling task, aimed 
-primiraly at inducing word representations.
-"""
-
-# import numpy as np
-# cimport numpy as np
-
 import utils
 
+# batch size for traing the LanguageModel
+cdef lm_batch_size = 1000
+
 cdef class LanguageModel(Network): 
+    """
+    A neural network for the language modeling task, aimed 
+    primiraly at inducing word representations.
+    """
     
     # sizes and learning rates
     cdef int half_window
@@ -45,22 +44,21 @@ cdef class LanguageModel(Network):
         high = 0.1
         output_bias = np.random.uniform(-high, high, (1))
         
-        net = LanguageModel(word_window, input_size, hidden_size, 
-                            hidden_weights, hidden_bias, output_weights, output_bias)
-        net.feature_tables = feature_tables
+        nn = cls(word_window, input_size, hidden_size, 
+                 hidden_weights, hidden_bias, output_weights, output_bias)
+        nn.feature_tables = feature_tables
         
-        return net
+        return nn
     
     def __init__(self, word_window, input_size, hidden_size, 
                  hidden_weights, hidden_bias, output_weights, output_bias):
         """
-        This function isn't expected to be directly called.
-        Instead, use the classmethods load_from_file or 
-        create_new.
+        This method shouldn't be called directly.
+        Instead, use the classmethods load_from_file() or create_new().
         """
-        self.learning_rate = 0
-        #self.learning_rate_features = np.zeros(len(self.feature_tables))
-        self.learning_rate_features = 0
+        # These will be set from arguments --l and --lf
+        self.learning_rate = 0.1
+        self.learning_rate_features = 0.1
         
         self.word_window_size = word_window
         self.half_window = self.word_window_size / 2
@@ -75,7 +73,8 @@ cdef class LanguageModel(Network):
     
     def _generate_token(self):
         """
-        Generates randomly a token to serve as a negative example.
+        Generates randomly a token ID for use as a negative example.
+        :return: a list of token features, one for each feature table
         """
         if self.next_random == len(self.random_pool):
             self._new_random_pool()
@@ -90,31 +89,35 @@ cdef class LanguageModel(Network):
         """
         Trains the network with a pair of positive/negative examples.
         The negative one is randomly generated.
+	:param example: the positive example, i.e. a list of a list of token IDs
         """
         cdef np.ndarray[INT_t, ndim=1] token
         cdef int i, j
         cdef np.ndarray[FLOAT_t, ndim=2] table
         
+        # a token is a list of feature IDs.
+        # token[0] is the list with the WordDictionary index of the word
         middle_token = example[self.half_window]
         while True:
             # ensure to get a different word
             variant = self._generate_token()
             
-            if variant != middle_token[0]:
+            if variant[0] != middle_token[0]:
                 break
         
         pos_input_values = self.lookup(example)
         pos_score = self.run(pos_input_values)
         pos_hidden_values = self.hidden_values
         
-        negative_token = np.array([variant])
+        negative_token = np.array(variant)
         example[self.half_window] = negative_token
-        neg_score = self.run(self.lookup(example))
+        neg_input_values = self.lookup(example)
+        neg_score = self.run(neg_input_values)
         
         # put the original token back
-        example[self.half_window] = middle_token
+        #example[self.half_window] = middle_token
         
-        error = max(0, neg_score - pos_score + 1)
+        error = max(0, 1 - pos_score + neg_score)
         self.error += error
         self.total_items += 1
         if error == 0: 
@@ -122,34 +125,40 @@ cdef class LanguageModel(Network):
             return
         
         # perform the correction
-        # gradient for the positive example is +1, for the negative one is -1
+        # negative gradient for the positive example is +1, for the negative one is -1
         # (remember the network still has the values of the negative example) 
         
-        # hidden gradients (the derivative of tanh(x) is 1 - tanh^2(x))
-        # hidden_neg_grads = (1 - self.hidden_values ** 2) * (- self.output_weights)
-        # hidden_pos_grads = (1 - pos_hidden_values ** 2) * self.output_weights
-        hidden_neg_grads = hardtanhe(self.hidden_values) * (- self.output_weights)
-        hidden_pos_grads = hardtanhe(pos_hidden_values) * self.output_weights
+        # output gradients
+        # pos_output_grads = 1
+        # neg_output_grads = -1
+        # (output_size) x (output_size, hidden_size) = (hidden_size)
+        # pos_output_weights_grads = pos_output_grads * self.output_weights
+        # neg_output_weights_grads = neg_output_grads * self.output_weights
+
+        # hidden gradients
+        # (hidden_size) * (hidden_size) = (hidden_size)
+        layer2_neg_grads = hardtanhe(self.hidden_values) * (- self.output_weights)
+        layer2_pos_grads = hardtanhe(pos_hidden_values) * self.output_weights
         
         # input gradients
-        input_neg_grads = self.learning_rate_features * hidden_neg_grads.dot(self.hidden_weights)
-        input_pos_grads = self.learning_rate_features * hidden_pos_grads.dot(self.hidden_weights)
+        # (hidden_size) x (hidden_size, input_size) = (input_size)
+        input_neg_grads = self.learning_rate_features * layer2_neg_grads.dot(self.hidden_weights)
+        input_pos_grads = self.learning_rate_features * layer2_pos_grads.dot(self.hidden_weights)
         
         # weight adjustment
         # output bias is left unchanged -- a correction would imply in bias += +delta -delta
+
+        # (output_size) x (hidden_size) = (output_size, hidden_size)
+        # (1) x (hidden_size) = (1, hidden_size)
         self.output_weights += self.learning_rate * (pos_hidden_values - self.hidden_values) 
         
         # hidden weights
-        # grad_matrix = np.tile(hidden_neg_grads, (self.input_size, 1)).T
-        # hidden_neg_deltas = grad_matrix * self.input_values
-        hidden_neg_deltas = hidden_neg_grads.T.dot(self.input_values)
+        # (hidden_size) x (input_size) = (hidden_size, input_size)
+        hidden_neg_grads = np.outer(layer2_neg_grads, neg_input_values)
+        hidden_pos_grads = np.outer(layer2_pos_grads, pos_input_values)
         
-        # grad_matrix = np.tile(hidden_pos_grads, (self.input_size, 1)).T
-        # hidden_pos_deltas = grad_matrix * pos_input_values
-        hidden_pos_deltas = hidden_pos_grads.T.dot(pos_input_values)
-        
-        self.hidden_weights += self.learning_rate * (hidden_neg_deltas + hidden_pos_deltas)
-        self.hidden_bias += self.learning_rate * (hidden_neg_grads + hidden_pos_grads)
+        self.hidden_weights += self.learning_rate * (hidden_neg_grads + hidden_pos_grads)
+        self.hidden_bias += self.learning_rate * (layer2_neg_grads + layer2_pos_grads)
         
         # this tracks where the deltas for the next table begins
         # (used for efficiency reasons)
@@ -161,11 +170,11 @@ cdef class LanguageModel(Network):
                 # regarding features from the j-th table
                 if i == self.half_window:
                     # this is the middle position. apply negative and positive deltas separately
-                    neg_deltas = input_neg_grads[start_from:start_from + table.shape[1]]
-                    pos_deltas = input_pos_grads[start_from:start_from + table.shape[1]]
+                    neg_grads = input_neg_grads[start_from:start_from + table.shape[1]]
+                    pos_grads = input_pos_grads[start_from:start_from + table.shape[1]]
                     
-                    table[negative_token[j]] += neg_deltas
-                    table[middle_token[j]] += pos_deltas
+                    table[negative_token[j]] += neg_grads
+                    table[middle_token[j]] += pos_grads
                     
                 else:
                     # this is not the middle position. both deltas apply.
@@ -181,8 +190,10 @@ cdef class LanguageModel(Network):
         Creates a pool of random indices, used for negative examples.
         Indices are generated at batches for efficiency.
         """
-        self.random_pool = [np.random.random_integers(0, table.shape[0] - 1, 1000) 
-                                    for table in self.feature_tables]
+        # generate 1000 indices for each table and then transpose
+        # so that each row represent a token
+        self.random_pool = np.array([np.random.random_integers(0, table.shape[0] - 1, lm_batch_size) 
+                                    for table in self.feature_tables]).T
         self.next_random = 0
                 
                 
@@ -200,13 +211,13 @@ cdef class LanguageModel(Network):
         self.skips = 0
         self.total_items = 0
         if iterations_between_reports > 0:
-            batches_between_reports = max(iterations_between_reports / 1000, 1)
+            batches_between_reports = max(iterations_between_reports / lm_batch_size, 1)
         
         # generate 1000 random indices at a time to save time
         # (generating 1000 integers at once takes about ten times the time for a single one)
-        num_batches = iterations / 1000
+        num_batches = iterations / lm_batch_size
         for batch in xrange(num_batches):
-            samples = np.random.random_integers(0, max_token, 1000)
+            samples = np.random.random_integers(0, max_token, lm_batch_size)
             
             for sample in samples:
                 # find which sentence in the corpus the sample token belongs to
@@ -316,9 +327,6 @@ Hidden layer size: %d
         """
         cdef float error = self.error / self.total_items
         logger = logging.getLogger("Logger")
-        logger.info("%d batches   Error:   %f   " \
-                    "%d out of %d corrections skipped" % (num + 1,
-                                                          error,
-                                                          self.skips,
-                                                          self.total_items))
+        logger.info("%d batches, correct: %d/%d, error: %.3f%%"
+                    % (num + 1, self.skips, self.total_items, error * 100))
 

@@ -79,7 +79,7 @@ cdef hardtanh(np.ndarray[DOUBLE_t, ndim=1] weights):
             out[i] = w
     return out
 
-cdef hardtanhd(np.ndarray[DOUBLE_t, ndim=2] weights):
+cdef hardtanhd(np.ndarray[DOUBLE_t] weights):
     """derivative of hardtanh"""
     cdef np.ndarray out = np.zeros_like(weights)
     cdef int i
@@ -89,7 +89,7 @@ cdef hardtanhd(np.ndarray[DOUBLE_t, ndim=2] weights):
             out.flat[i] = 1.0
     return out
 
-cdef hardtanhe(np.ndarray[DOUBLE_t, ndim=2] y):
+cdef hardtanhe(np.ndarray[DOUBLE_t] y):
     """derivative of hardtanh in terms of y = hardtanh(x) ="""
     cdef np.ndarray out = np.ones_like(y)
     cdef int i
@@ -230,7 +230,7 @@ Output size: %d
         :param indices: a 2-dim np array of indices into the feature tables.
             Each row represents a token through its indices into each feature table.
 	:return: a list of feature vectors, each one combining the vectors of
-        the corresponding features in :param indices:
+            the corresponding features in :param indices:
         """
         return np.concatenate([table[index] 
                                for token_indices in indices
@@ -693,7 +693,7 @@ Output size: %d
         # no weights to adjust
 
         # dC / df_2 = hardtanhd(f_2) * dC / df_3
-        # (len, hidden_size) (len, hidden_size)
+        # (len, hidden_size) * (len, hidden_size) = (len, hidden_size)
         # FIXME: this goes quickly to 0.
         dCdf_2 = hardtanhd(self.layer2_sent_values) * dCdf_3
 

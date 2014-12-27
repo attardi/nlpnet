@@ -1,3 +1,8 @@
+2014-12-26  Giuseppe Attardi  <attardi@di.unipi.it>
+
+	* word_dictionary.py (WordDictionary): make senna the default variant
+	(WordDictionary): just use a single padding for both left and right
+
 2014-12-23  Giuseppe Attardi  <attardi@di.unipi.it>
 
 	* metadata.py (Metadata.save_to_file): use file names from config.py

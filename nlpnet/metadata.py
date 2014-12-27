@@ -7,7 +7,6 @@ and save it to a file in the data directory.
 """
 
 import cPickle
-import os
 
 import config
 
@@ -17,11 +16,14 @@ class Metadata(object):
     parameter files.
     """
     
-    def __init__(self, task, use_caps=True, use_suffix=False, use_pos=False,
+    def __init__(self, task, paths = None, use_caps=True, use_suffix=False,
+                 use_prefix=False, use_pos=False,
                  use_chunk=False, use_lemma=False, use_gazetteer=False):
         self.task = task
+        self.paths = paths if paths else config.FILES
         self.use_caps = use_caps
         self.use_suffix = use_suffix
+        self.use_prefix = use_prefix
         self.use_pos = use_pos
         self.use_chunk = use_chunk
         self.use_lemma = use_lemma
@@ -92,66 +94,26 @@ class Metadata(object):
         Save the contents of the metadata to a file. The filename is determined according
         to the task.
         """
-        filename = config.FILES[self.metadata]
+        filename = self.paths[self.metadata]
         with open(filename, 'wb') as f:
             cPickle.dump(self.__dict__, f, 2)
     
     @classmethod
-    def load_from_file(cls, task):
+    def load_from_file(cls, task, paths = None):
         """
         Reads the file containing the metadata for the given task and returns a 
         Metadata object.
         """
+        if paths is None:
+            paths = config.FILES
+        md = Metadata(None, paths)
+
         # the actual content of the file is the __dict__ member variable, which contain all
         # the instance's data
-        filename = config.FILES[self.metadata]
-        md = Metadata(None)
+        filename = paths[self.metadata]
         with open(filename, 'rb') as f:
             data = cPickle.load(f)
-        
         md.__dict__.update(data)
         
         return md
 
-
-
-if __name__ == '__main__':
-    
-    import argparse
-    
-    parser = argparse.ArgumentParser(description='This script will save a metadata file in the data directory.')
-    parser.add_argument('--task', choices=['srl', 'pos', 'ner'], 
-                        help='Task for which the network should be used.', type=str)
-    parser.add_argument('--pos', help='Use POS as a feature',
-                        action='store_true')
-    parser.add_argument('--chunk', help='Use chunks as a feature',
-                        action='store_true')
-    parser.add_argument('--lemma', help='Use lemmas instead of the actual words',
-                        action='store_true')
-    parser.add_argument('--use_gazetteer', help='Include gazetteer features (for NER only).',
-                        action='store_true')                        
-    parser.add_argument('--caps', help='Use capitalization as a feature',
-                        action='store_true')
-    parser.add_argument('--suf', help='Use suffix features', action='store_true', dest='suffix')
-    parser.add_argument('--id', help='Only argument identification (SRL only)',
-                        action='store_true', dest='identify')
-    parser.add_argument('--class', help='Only argument classification (SRL only)',
-                        action='store_true', dest='classify')
-    parser.add_argument('--pred', help='Only predicate identification (SRL only)',
-                        action='store_true', dest='predicates')
-    
-    args = parser.parse_args()
-    if args.identify:
-        args.task = 'srl_boundary'
-    elif args.classify:
-        args.task = 'srl_classify'
-    elif args.predicates:
-        args.task = 'srl_predicates'
-    
-    m = Metadata(args.task, args.caps, args.suffix, args.pos, args.chunk, args.lemma, args.gazetteer)
-    m.save_to_file()
-    
-    
-    
-    
-    
