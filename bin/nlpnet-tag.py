@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-This script will run a POS or SRL tagger on the input data and print the results
-to stdout.
+This script will run a POS, NER or SRL tagger on the input data and print
+the results to stdout.
+
 """
 
 import argparse
@@ -100,12 +101,13 @@ def _print_tagged_pos(tagged_sents):
 
 def _print_tagged_srl(tagged_sents):
     for sent in tagged_sents:
-        print ' '.join(sent.tokens)
+        print ' '.join(sent.tokens).encode('utf-8')
         for predicate, arg_structure in sent.arg_structures:
-            print predicate
+            print predicate.encode('utf-8')
             for label in arg_structure:
                 argument = ' '.join(arg_structure[label])
-                print '\t%s: %s' % (label, argument)
+                line = '\t%s: %s' % (label, argument)
+                print line.encode('utf-8')
         print
 
 def _print_tagged_ner(tagged_sents):
@@ -133,4 +135,4 @@ if __name__ == '__main__':
     
     #interactive_running(args.task)
     process_input(args.task)
-    
+
