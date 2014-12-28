@@ -208,8 +208,10 @@ def train(text_reader, args):   # was reader. Attardi
         nn.train(text_reader.sentences, text_reader.predicates, text_reader.tags, 
                  args.iterations, report_intervals, args.accuracy, arg_limits)
     elif args.task == 'lm':
+        report_intervals = 10000
         nn.train(text_reader.sentences, args.iterations, report_intervals)
     elif args.task == 'sslm':
+        report_intervals = 10000
         nn.train(text_reader.sentences, args.iterations, report_intervals, text_reader.polarities, text_reader.word_dict)
     else:
         nn.train(text_reader.sentences, text_reader.tags, 
@@ -267,14 +269,14 @@ if __name__ == '__main__':
     logger.info("Feature vectors learning rate: %f" % nn.learning_rate_features)
     logger.info("Tag transition matrix learning rate: %f" % nn.learning_rate_trans)
     
-    nn_file = config.FILES[md.network]
-    nn.saver = saver(nn_file, md)
+    nn.filename = config.FILES[md.network]
+    nn.saver = saver(nn.filename, md)
 
     train(text_reader, args)
     
     logger.info("Saving trained models...")
     save_features(nn, md)
     
-    nn.save(nn_file)
+    nn.save(nn.filename)
     logger.info("Saved network to %s" % nn_file)
     

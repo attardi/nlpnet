@@ -20,7 +20,7 @@ cdef class SentimentModel(LanguageModel):
     @classmethod
     def create_new(cls, feature_tables, int word_window, int hidden_size, float alpha):
         """
-        Initializes a new neural network for training.
+        Initializes a new neural network initialized for training.
         :param word_window: defaut 3
         :param hidden_size: default 20
         :param alpha: default 0.5
@@ -30,16 +30,18 @@ cdef class SentimentModel(LanguageModel):
         input_size *= word_window
         
         # creates the weight matrices
-        high = 2.38 / np.sqrt(input_size) # [Bottou-88]
-        #high = 0.1              # Fonseca
+        #high = 2.38 / np.sqrt(input_size) # [Bottou-88]
+        high = 2.45 / np.sqrt(input_size + hidden_size) # Al-Rfou
         hidden_weights = np.random.uniform(-high, high, (hidden_size, input_size))
         high = 2.38 / np.sqrt(hidden_size) # [Bottou-88]
-        #high = 0.1              # Fonseca
-        hidden_bias = np.random.uniform(-high, high, (hidden_size))
+        #hidden_bias = np.random.uniform(-high, high, (hidden_size))
+        hidden_bias = np.zeros(hidden_size, dtype=FLOAT) # Al-Rfou
+
         # There are two output weights: syntactic and sentiment
+        high = 2.45 / np.sqrt(hidden_size + 2) # Al-Rfou
         output_weights = np.random.uniform(-high, high, (2, hidden_size))
-        high = 0.1
-        output_bias = np.random.uniform(-high, high, (2))
+        #output_bias = np.random.uniform(-high, high, (2))
+        output_bias = np.array([0.0, 0.0])       # Al-Rfou
         
         nn = SentimentModel(word_window, input_size, hidden_size, 
                             hidden_weights, hidden_bias, output_weights, output_bias)
@@ -47,8 +49,8 @@ cdef class SentimentModel(LanguageModel):
         nn.alpha = alpha
 
         # cumulative AdaGrad
-        nn.neg_hidden_adagrads = np.zeros(hidden_size)
-        nn.pos_hidden_adagrads = np.zeros(hidden_size)
+        nn.neg_hidden_adagrads = np.zeros(hidden_size, dtype=FLOAT)
+        nn.pos_hidden_adagrads = np.zeros(hidden_size, dtype=FLOAT)
 
         return nn
 
@@ -144,11 +146,11 @@ cdef class SentimentModel(LanguageModel):
         cdef np.ndarray hidden_bias_grads = pos_hidden_grads + neg_hidden_grads
 
         # weight adjustment
-        self.output_weights += self.learning_rate * output_weights_grads
-        self.output_bias += self.learning_rate * output_bias_grads
+        self.output_weights += self.LR_2 * output_weights_grads
+        self.output_bias += self.LR_2 * output_bias_grads
         
-        self.hidden_weights += self.learning_rate * hidden_weights_grads
-        self.hidden_bias += self.learning_rate * hidden_bias_grads
+        self.hidden_weights += self.LR_1 * hidden_weights_grads
+        self.hidden_bias += self.LR_1 * hidden_bias_grads
         
         # input gradients, using AdaGrad
         self.neg_hidden_adagrads += np.power(neg_hidden_grads, 2)
@@ -158,32 +160,31 @@ cdef class SentimentModel(LanguageModel):
         self.pos_hidden_adagrads += np.power(pos_hidden_grads, 2)
         pos_input_grads = (pos_hidden_grads / np.sqrt(self.pos_hidden_adagrads)).dot(self.hidden_weights)
 
-        neg_input_deltas = self.learning_rate_features * neg_input_grads
-        pos_input_deltas = self.learning_rate_features * pos_input_grads
+        neg_input_deltas = self.LR_0 * neg_input_grads
+        pos_input_deltas = self.LR_0 * pos_input_grads
         
         # this tracks where the deltas for the next table begins
-        cdef int start = 0
+        cdef int offset = 0
              
         for i, token in enumerate(example):
             for j, table in enumerate(self.feature_tables): # just one table
                 # this is the column for the i-th position in the window
                 # regarding features from the j-th table
-                neg_deltas = neg_input_deltas[start:start + table.shape[1]]
-                pos_deltas = pos_input_deltas[start:start + table.shape[1]]
+                neg_deltas = neg_input_deltas[offset: offset + table.shape[1]]
+                pos_deltas = pos_input_deltas[offset: offset + table.shape[1]]
                     
                 if i == self.half_window:
                     # this is the middle position.
                     # apply negative and positive deltas to proper token
                     table[negative_token[j]] += neg_deltas
                     table[middle_token[j]] += pos_deltas
-                    
                 else:
                     # this is not the middle position. both deltas apply.
                     table[token[j]] += neg_deltas + pos_deltas
                 
-                start += table.shape[1]
+                offset += table.shape[1]
     
-    def train(self, list sentences, int iterations, int iterations_between_reports, list polarities, ngram_dict):
+    def train(self, list sentences, int epochs, int iterations_between_reports, list polarities, ngram_dict):
         """
         Trains the sentiment language model on the given sentences.
         :param sentences: list of token IDs for each sentence
@@ -191,59 +192,54 @@ cdef class SentimentModel(LanguageModel):
         :param polarities: the polarity of each sentence, +-1.
         :param ngram_dixt: the dictionary of the ngrams on the corpus
         """
-        # index containing how many tokens there are in the corpus up to
-        # a given sentence.
-        # Useful for sampling tokens with equal probability from the whole corpus
-        index = np.cumsum([len(sent) for sent in sentences]) - 1
-        max_token = index[-1]
-        
-        self._new_random_pool()
-        self.error = 0
-        self.skips = 0
-        self.total_items = 0
-        if iterations_between_reports > 0:
-            batches_between_reports = max(iterations_between_reports / lm_batch_size, 1)
-        
         # generate 1000 random indices at a time to save time
         # (generating 1000 integers at once takes about ten times the time for a single one)
-        cdef int num_batches = iterations / lm_batch_size
-        cdef int count = 0
-        for batch in xrange(num_batches):
-            samples = np.random.random_integers(0, max_token, lm_batch_size)
-            
-            for sample in samples:
-                # find which sentence in the corpus the sample token belongs to
-                sentence_num = index.searchsorted(sample)
-                sentence = sentences[sentence_num]
+        self.random_pool = RandomPool(self.feature_tables)
+        self.total_items = 0
+
+        # how often to save model
+        save_period = 1000 * RandomPool_size
+
+        all_cases = sum([len(sen) for sen in sentences]) * epochs * self.ngrams
+
+        for epoch in xrange(self.epochs):
+            self.error = 0.0
+            self.skips = 0
+            epoch_examples = 0
+            # update LR by fan-in
+            # decrease linearly by remaining
+            remaining = 1.0 - (self.total_items / float(all_cases))
+            self.LR_0 = max(0.001, self.learning_rate * remaining)
+            self.LR_1 = max(0.001, self.learning_rate / self.input_size * remaining)
+            self.LR_2 = max(0.001, self.learning_rate / self.hidden_size * remaining)
+
+            for num, sentence in enumerate(sentences):
+                for pos in xrange(len(sentence)):
                 
-                # the position of the token within the sentence
-                token_position = sample - index[sentence_num] + len(sentence) - 1
-                
-		# ngram size changes periodically
-                if count:
-                    if count % 5 == 0:
-                        size = 2
-                    elif count % 17 == 0:
-                        size = 3
+                    # ngram size changes periodically
+                    if self.total_items:
+                        if self.total_items % 5 == 0:
+                            size = 2
+                        elif self.total_items % 17 == 0:
+                            size = 3
+                        else:
+                            size = 1
                     else:
                         size = 1
-                else:
-                    size = 1
-        
-                # extract a window of tokens around the given position
-                window = self._extract_window(sentence, token_position, size, ngram_dict)
 
-                self._train_pair(window, polarities[sentence_num], size)
-            
-            if iterations_between_reports > 0 and \
-               (batch % batches_between_reports == 0 or batch == num_batches - 1):
-                self._print_batch_report(batch)
-                self.error = 0
-                self.skips = 0
-                self.total_items = 0
-            # save language model. Attardi
-            if batch and batch % 100 == 0:
-                utils.save_features_to_file(self.feature_tables[0], self.filename)
+                    # extract a window of tokens around the given position
+                    window = self._extract_window(sentence, pos, size, ngram_dict)
+
+                    self._train_pair(window, polarities[num], size)
+                    epoch_examples += 1
+
+                    if iterations_between_reports > 0 and \
+                       (self.total_items and
+                        self.total_items % iterations_between_reports == 0):
+                        self._progress_report(epoch, epoch_examples)
+                        # save language model. Attardi
+                        if save_period and self.total_items % save_period == 0:
+                            utils.save_features_to_file(self.feature_tables[0], self.filename)
     
     def _extract_window(self, sentence, position, size=1, ngram_dict=None):
         """
@@ -278,29 +274,5 @@ cdef class SentimentModel(LanguageModel):
     
     @classmethod
     def load_from_file(cls, filename):
-        """
-        Loads the neural network from a file.
-        It will load weights, biases, sizes and padding, but 
-        not feature tables.
-        """
-        data = np.load(filename)
-        
-        # cython classes don't have the __dict__ attribute
-        # so we can't do an elegant self.__dict__.update(data)
-        hidden_weights = data['hidden_weights']
-        hidden_bias = data['hidden_bias']
-        output_weights = data['output_weights']
-        output_bias = data['output_bias']
-        
-        word_window_size = data['word_window_size']
-        input_size = data['input_size']
-        hidden_size = data['hidden_size']
-        
-        nn = SentimentModel(word_window_size, input_size, hidden_size, 
-                           hidden_weights, hidden_bias, output_weights, output_bias)
-        
-        nn.padding_left = data['padding_left']
-        nn.padding_right = data['padding_right']
-        
-        return nn
-
+        # inherit from base class
+        return LanguageModel.load_from_file.__func__(cls, filename)

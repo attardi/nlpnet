@@ -3,7 +3,42 @@
 import utils
 
 # batch size for traing the LanguageModel
-cdef lm_batch_size = 1000
+# should be a class variable (not allowed in Cython)
+cdef int RandomPool_size = 1000
+
+cdef class RandomPool:
+
+    cdef pool
+    cdef tables
+    cdef int current
+
+    def __init__(self, tables):
+        self.tables = tables
+        self._new_pool()
+
+    def _new_pool(self):            
+        """
+        Creates a pool of random feature indices, used for negative examples.
+        """
+        # generate 1000 indices for each table and then transpose
+        # so that each row represents a token
+        self.pool = np.array([np.random.random_integers(0, table.shape[0] - 1, RandomPool_size) 
+                                    for table in self.tables], dtype=FLOAT).T
+        self.current = 0
+
+    def next(self):
+        """
+        Generates randomly a token for use as a negative example.
+        :return: a list of token features, one for each feature table
+        """
+        if self.current == len(self.pool):
+            self._new_pool()
+        
+        token = self.pool[self.current]
+        self.current += 1
+        
+        return token
+
 
 cdef class LanguageModel(Network): 
     """
@@ -18,31 +53,42 @@ cdef class LanguageModel(Network):
     cdef int total_items
     
     # pool of random numbers (used for efficiency)
-    cdef np.ndarray random_pool
-    cdef int next_random
+    cdef RandomPool random_pool
 
     # file where to save model (Attardi)
     cdef public char* filename
     
+    # learning rates for each layer
+    cdef float LR_0, LR_1, LR_2
+
     @classmethod
     def create_new(cls, feature_tables, int word_window, int hidden_size):
         """
-        Creates a new neural network.
+        Creates a new neural network initialized for training.
         """
         # sum the number of features in all tables 
         cdef int input_size = sum(table.shape[1] for table in feature_tables)
         input_size *= word_window
         
+        # Note : optimal initialization of weights is dependent on the
+        #        activation function used (among other things).
+        #        For example, results presented in [Xavier10] suggest that you
+        #        should use 4 times larger initial weights for sigmoid
+        #        compared to tanh
+
         # creates the weight matrices
-        high = 2.38 / np.sqrt(input_size) # [Bottou-88]
-        #high = 0.1              # Fonseca
+        #high = 2.38 / np.sqrt(input_size) # [Bottou-88]
+        high = 2.45 / np.sqrt(input_size + hidden_size) # Al-Rfou
         hidden_weights = np.random.uniform(-high, high, (hidden_size, input_size))
         high = 2.38 / np.sqrt(hidden_size) # [Bottou-88]
-        #high = 0.1              # Fonseca
-        hidden_bias = np.random.uniform(-high, high, (hidden_size))
+        #hidden_bias = np.random.uniform(-high, high, (hidden_size))
+        hidden_bias = np.zeros(hidden_size) # Al-Rfou
+
+        high = 2.45 / np.sqrt(hidden_size + 1) # Al-Rfou
         output_weights = np.random.uniform(-high, high, (hidden_size))
-        high = 0.1
-        output_bias = np.random.uniform(-high, high, (1))
+        #high = 0.1
+        #output_bias = np.random.uniform(-high, high, (1))
+        output_bias = np.array([0.0], dtype=FLOAT) # Al-Rfou
         
         nn = cls(word_window, input_size, hidden_size, 
                  hidden_weights, hidden_bias, output_weights, output_bias)
@@ -71,19 +117,6 @@ cdef class LanguageModel(Network):
         self.output_bias = output_bias
         self.filename = ''      # Attardi
     
-    def _generate_token(self):
-        """
-        Generates randomly a token ID for use as a negative example.
-        :return: a list of token features, one for each feature table
-        """
-        if self.next_random == len(self.random_pool):
-            self._new_random_pool()
-        
-        token = self.random_pool[self.next_random]
-        self.next_random += 1
-        
-        return token
-        
     
     def _train_pair(self, example):
         """
@@ -100,8 +133,7 @@ cdef class LanguageModel(Network):
         middle_token = example[self.half_window]
         while True:
             # ensure to get a different word
-            variant = self._generate_token()
-            
+            variant = self.random_pool.next()
             if variant[0] != middle_token[0]:
                 break
         
@@ -109,14 +141,12 @@ cdef class LanguageModel(Network):
         pos_score = self.run(pos_input_values)
         pos_hidden_values = self.hidden_values
         
-        negative_token = np.array(variant)
+        negative_token = np.array(variant, dtype=FLOAT)
         example[self.half_window] = negative_token
         neg_input_values = self.lookup(example)
         neg_score = self.run(neg_input_values)
         
-        # put the original token back
-        #example[self.half_window] = middle_token
-        
+        # hinge loss
         error = max(0, 1 - pos_score + neg_score)
         self.error += error
         self.total_items += 1
@@ -142,123 +172,150 @@ cdef class LanguageModel(Network):
         
         # input gradients
         # (hidden_size) x (hidden_size, input_size) = (input_size)
-        input_neg_grads = self.learning_rate_features * layer2_neg_grads.dot(self.hidden_weights)
-        input_pos_grads = self.learning_rate_features * layer2_pos_grads.dot(self.hidden_weights)
+        input_neg_grads = self.LR_0 * layer2_neg_grads.dot(self.hidden_weights)
+        input_pos_grads = self.LR_0 * layer2_pos_grads.dot(self.hidden_weights)
         
         # weight adjustment
         # output bias is left unchanged -- a correction would imply in bias += +delta -delta
 
         # (output_size) x (hidden_size) = (output_size, hidden_size)
         # (1) x (hidden_size) = (1, hidden_size)
-        self.output_weights += self.learning_rate * (pos_hidden_values - self.hidden_values) 
+        self.output_weights += self.LR_2 * (pos_hidden_values - self.hidden_values) 
         
         # hidden weights
         # (hidden_size) x (input_size) = (hidden_size, input_size)
         hidden_neg_grads = np.outer(layer2_neg_grads, neg_input_values)
         hidden_pos_grads = np.outer(layer2_pos_grads, pos_input_values)
         
-        self.hidden_weights += self.learning_rate * (hidden_neg_grads + hidden_pos_grads)
-        self.hidden_bias += self.learning_rate * (layer2_neg_grads + layer2_pos_grads)
+        self.hidden_weights += self.LR_1 * (hidden_neg_grads + hidden_pos_grads)
+        self.hidden_bias += self.LR_1 * (layer2_neg_grads + layer2_pos_grads)
         
         # this tracks where the deltas for the next table begins
-        # (used for efficiency reasons)
-        cdef int start_from = 0
+        cdef int offset = 0
              
         for i, token in enumerate(example):
             for j, table in enumerate(self.feature_tables):
                 # this is the column for the i-th position in the window
                 # regarding features from the j-th table
+                neg_grads = input_neg_grads[offset: offset + table.shape[1]]
+                pos_grads = input_pos_grads[offset: offset + table.shape[1]]
                 if i == self.half_window:
                     # this is the middle position. apply negative and positive deltas separately
-                    neg_grads = input_neg_grads[start_from:start_from + table.shape[1]]
-                    pos_grads = input_pos_grads[start_from:start_from + table.shape[1]]
                     
                     table[negative_token[j]] += neg_grads
                     table[middle_token[j]] += pos_grads
-                    
                 else:
                     # this is not the middle position. both deltas apply.
-                    deltas = input_neg_grads[start_from:start_from + table.shape[1]] + \
-                             input_pos_grads[start_from:start_from + table.shape[1]]
+                    table[token[j]] += neg_grads + pos_grads
                 
-                    table[token[j]] += deltas
+                offset += table.shape[1]
+
                 
-                start_from += table.shape[1]
-    
-    def _new_random_pool(self):            
-        """
-        Creates a pool of random indices, used for negative examples.
-        Indices are generated at batches for efficiency.
-        """
-        # generate 1000 indices for each table and then transpose
-        # so that each row represent a token
-        self.random_pool = np.array([np.random.random_integers(0, table.shape[0] - 1, lm_batch_size) 
-                                    for table in self.feature_tables]).T
-        self.next_random = 0
-                
-                
-    def train(self, list sentences, int iterations, int iterations_between_reports):
+    def train(self, list sentences, int epochs, int iterations_between_reports):
         """
         Trains the language model over the given sentences.
+        :param epochs: number of iterations over the sentences
         """
-        # index containing how many tokens are there in the corpus, per sentence
-        # useful for sampling tokens with equal probability from the whole corpus
-        index = np.cumsum([len(sent) for sent in sentences]) - 1
-        max_token = index[-1]
-        
-        self._new_random_pool()
-        self.error = 0
-        self.skips = 0
-        self.total_items = 0
-        if iterations_between_reports > 0:
-            batches_between_reports = max(iterations_between_reports / lm_batch_size, 1)
         
         # generate 1000 random indices at a time to save time
         # (generating 1000 integers at once takes about ten times the time for a single one)
-        num_batches = iterations / lm_batch_size
-        for batch in xrange(num_batches):
-            samples = np.random.random_integers(0, max_token, lm_batch_size)
-            
-            for sample in samples:
-                # find which sentence in the corpus the sample token belongs to
-                sentence_num = index.searchsorted(sample)
-                sentence = sentences[sentence_num]
+        self.random_pool = RandomPool(self.feature_tables)
+        self.total_items = 0
+        
+        # how often to save model
+        save_period = 1000 * RandomPool_size
+
+        all_cases = sum([len(sen) for sen in sentences]) * epochs
+
+        # TODO: parallelize
+        # see: http://radimrehurek.com/2013/10/parallelizing-word2vec-in-python/
+        # all threads access the same matrix of neural weights, and there’s no
+        # locking, so they may be overwriting the same weights willy-nilly at
+        # the same time. Apparently this hack even has a fancy name in
+        # academia: “asynchronous stochastic gradient descent”.
+
+#         from queue import Queue
+#
+#         jobs = Queue(maxsize=2 * self.workers)  # buffer ahead only a limited number of jobs
+#         lock = threading.Lock()  # for shared state
+#
+#         def worker_train():
+#             """Train the model, lifting lists of sentences from the jobs queue."""
+#             params = Params()  # each thread has its own hidden weights
+#             gradients = Params()  # and gradients
+#
+#             while True:
+#                 job = jobs.get()
+#                 if job is None:  # data finished, exit
+#                     break
+#                 job_words = self._train_batch(self, params, gradients)
+#                 with lock:
+#                     word_count[0] += job_words
+#                     elapsed = time.time() - start
+#                     if elapsed >= next_report[0]:
+#                         logger.info("PROGRESS: at %.2f%% examples" %
+#                             (100.0 * word_count[0] / total_words))
+#                         # wait at least one second between progress reports
+#                         next_report[0] = elapsed + 1.0
+#         workers = [threading.Thread(target=worker_train) for _ in xrange(self.workers)]
+#         for thread in workers:
+#             thread.daemon = True  # make interrupting the process with ctrl+c easier
+#             thread.start()
+#
+#         # fill the job queue
+#         for job in grouper(sentences, chunksize):
+#             jobs.put(job)
+#         for _ in xrange(self.workers):
+#             jobs.put(None)  # signal finish
+#
+#         for thread in workers:
+#             thread.join()
+
+        for epoch in xrange(epochs):
+            self.error = <FLOAT_t>0.0
+            self.skips = 0
+            epoch_examples = 0
+            # update LR by fan-in
+            # decrease linearly by remaining
+            remaining = 1.0 - (self.total_items / float(all_cases))
+            self.LR_0 = max(0.001, self.learning_rate * remaining)
+            self.LR_1 = max(0.001, self.learning_rate / self.input_size * remaining)
+            self.LR_2 = max(0.001, self.learning_rate / self.hidden_size * remaining)
+
+            for sentence in sentences:
+                for pos in xrange(len(sentence)):
+                    # extract the window around the given position
+                    window = self._extract_window(sentence, pos)
                 
-                # the position of the token within the sentence
-                token_position = sample - index[sentence_num] + len(sentence) - 1
-                
-                # extract the window around the token
-                window = self._extract_window(sentence, token_position)
-                
-                self._train_pair(window)
-            
-            if iterations_between_reports > 0 and \
-               (batch % batches_between_reports == 0 or batch == num_batches - 1):
-                self._print_batch_report(batch)
-                self.error = 0
-                self.skips = 0
-                self.total_items = 0
-            # save language model. Attardi
-            if batch and batch % 100 == 0:
-                utils.save_features_to_file(self.feature_tables[0], self.filename)
+                    self._train_pair(window)
+                    epoch_examples += 1
+
+                    if iterations_between_reports > 0 and \
+                       (self.total_items and
+                        self.total_items % iterations_between_reports == 0):
+                        self._progress_report(epoch, epoch_examples)
+                        # save language model. Attardi
+                        if save_period and self.total_items % save_period == 0:
+                            utils.save_features_to_file(self.feature_tables[0], self.filename)
     
     def _extract_window(self, sentence, position):
         """
         Extracts a token window from the sentence, with the size equal to the
-        network's window size. This function takes care of creating padding as necessary.
+        network's window size.
+        This function takes care of creating padding as necessary.
         """
         if position < self.half_window:
             num_padding = self.half_window - position
-            pre_padding = np.array(num_padding * [self.padding_left])
-            sentence = np.vstack((pre_padding, sentence))
+            pre_padding = np.array(num_padding * [self.padding_left], dtype=np.int)
+            sentence = np.concatenate((pre_padding, sentence))
             position += num_padding
         
         # number of tokens in the sentence after the position
         tokens_after = len(sentence) - position - 1
         if tokens_after < self.half_window:
             num_padding = self.half_window - tokens_after
-            pos_padding = np.array(num_padding * [self.padding_right])
-            sentence = np.vstack((sentence, pos_padding))
+            pos_padding = np.array(num_padding * [self.padding_right], dtype=np.int)
+            sentence = np.concatenate((sentence, pos_padding))
         
         return sentence[position - self.half_window : position + self.half_window + 1]
     
@@ -282,7 +339,7 @@ Hidden layer size: %d
         """
         Saves the neural network to a file.
         It will save the weights, biases, sizes, and padding,
-        but not feature tables.
+        but not the feature tables nor the vocabulary.
         """
         np.savez(filename, hidden_weights=self.hidden_weights,
                  output_weights=self.output_weights,
@@ -312,21 +369,22 @@ Hidden layer size: %d
         input_size = data['input_size']
         hidden_size = data['hidden_size']
         
-        nn = LanguageModel(word_window_size, input_size, hidden_size, 
-                           hidden_weights, hidden_bias, output_weights, output_bias)
+        nn = cls(word_window_size, input_size, hidden_size, 
+                 hidden_weights, hidden_bias, output_weights, output_bias)
         
         nn.padding_left = data['padding_left']
         nn.padding_right = data['padding_right']
         
         return nn
     
-    def _print_batch_report(self, int num):
+    def _progress_report(self, int num, epoch_examples):
         """
         Reports the status of the network in the given training
         epoch, including error and accuracy.
         """
+        # FIXME: should use moving average
         cdef float error = self.error / self.total_items
         logger = logging.getLogger("Logger")
-        logger.info("%d batches, correct: %d/%d, error: %.3f%%"
-                    % (num + 1, self.skips, self.total_items, error * 100))
+        logger.info("Epoch %d, examples: %d, correct: %d/%d, error: %.3f%%"
+                    % (num + 1, self.total_items, self.skips, epoch_examples, error * 100))
 

@@ -14,6 +14,7 @@ from cpython cimport bool
 from itertools import izip
 import logging
 
+from numpy import float as FLOAT
 ctypedef np.float_t FLOAT_t
 ctypedef np.int_t INT_t
 ctypedef np.double_t DOUBLE_t
@@ -21,7 +22,7 @@ ctypedef np.double_t DOUBLE_t
 # ----------------------------------------------------------------------
 # Math functions
 
-cdef softmax(np.ndarray a, axis=0):
+cdef softmax(np.ndarray[FLOAT_t] a, axis=0):
     """Compute the ratio of exp(a) to the sum of exponentials along the axis.
 
     Parameters
@@ -40,7 +41,7 @@ cdef softmax(np.ndarray a, axis=0):
     e = np.exp(a - a_max)
     return e / np.sum(e, axis)
 
-cdef logsumexp(np.ndarray a, axis=None):
+cdef logsumexp(np.ndarray[FLOAT_t] a, axis=None):
     """Compute the log of the sum of exponentials of input elements.
     like: scipy.misc.logsumexp
 
@@ -65,9 +66,9 @@ cdef logsumexp(np.ndarray a, axis=None):
     a_max = a.max(axis=0)
     return np.log(np.sum(np.exp(a - a_max), axis=0)) + a_max
 
-cdef hardtanh(np.ndarray[DOUBLE_t, ndim=1] weights):
+cdef hardtanh(np.ndarray[FLOAT_t, ndim=1] weights):
     """Hard hyperbolic tangent."""
-    cdef np.ndarray out = np.empty_like(weights)
+    cdef np.ndarray[FLOAT_t] out = np.empty_like(weights)
     cdef int i
     cdef double w
     for i, w in enumerate(weights):
@@ -79,9 +80,9 @@ cdef hardtanh(np.ndarray[DOUBLE_t, ndim=1] weights):
             out[i] = w
     return out
 
-cdef hardtanhd(np.ndarray[DOUBLE_t] weights):
+cdef hardtanhd(np.ndarray[FLOAT_t] weights):
     """derivative of hardtanh"""
-    cdef np.ndarray out = np.zeros_like(weights)
+    cdef np.ndarray[FLOAT_t] out = np.zeros_like(weights)
     cdef int i
     cdef double w
     for i, w in enumerate(weights.flat):
@@ -89,9 +90,9 @@ cdef hardtanhd(np.ndarray[DOUBLE_t] weights):
             out.flat[i] = 1.0
     return out
 
-cdef hardtanhe(np.ndarray[DOUBLE_t] y):
+cdef hardtanhe(np.ndarray[FLOAT_t] y):
     """derivative of hardtanh in terms of y = hardtanh(x) ="""
-    cdef np.ndarray out = np.ones_like(y)
+    cdef np.ndarray[FLOAT_t] out = np.ones_like(y)
     cdef int i
     cdef double w
     for i, w in enumerate(y.flat):
@@ -224,7 +225,7 @@ Output size: %d
         
         return desc
     
-    def lookup(self, np.ndarray indices):
+    def lookup(self, np.ndarray[INT_t, ndim=2] indices):
         """Find the actual input values concatenating the feature vectors
         for each input token.
         :param indices: a 2-dim np array of indices into the feature tables.
@@ -238,7 +239,7 @@ Output size: %d
                                                         self.feature_tables)
                                ])
     
-    def run(self, np.ndarray input_data):
+    def run(self, np.ndarray[FLOAT_t] input_data):
         """
         Runs the network for a given input. 
         
@@ -366,8 +367,8 @@ Output size: %d
             If False, the error was too low and weight correction should be
             skipped.
         """
-        cdef np.ndarray[DOUBLE_t, ndim=2] delta # (len(sentence), output_size)
-        cdef np.ndarray[DOUBLE_t, ndim=2] path_scores # (output_size, output_size)
+        cdef np.ndarray[FLOAT_t, ndim=2] delta # (len(sentence), output_size)
+        cdef np.ndarray[FLOAT_t, ndim=2] path_scores # (output_size, output_size)
         
         # ftheta_i,t = network output for i-th tag, at t-th word
         # s = Sum_i(A_tags[i-1],tags[i] + ftheta_i,i), i < len(sentence)   (12)
@@ -495,7 +496,7 @@ Output size: %d
         return True
 
     @cython.boundscheck(False)
-    def _viterbi(self, np.ndarray[DOUBLE_t, ndim=2] scores):
+    def _viterbi(self, np.ndarray[FLOAT_t, ndim=2] scores):
         """
         Performs a Viterbi search over the scores for each tag using
         the transitions matrix. If a matrix wasn't supplied, 
@@ -583,7 +584,7 @@ Output size: %d
                 or self.accuracy >= desired_accuracy > 0 \
                 or (self.accuracy < last_accuracy and self.error > last_error):
                 
-                self._print_epoch_report(i + 1)
+                self._epoch_report(i + 1)
                 
                 if self.accuracy >= desired_accuracy > 0 \
                         or (self.error > last_error and self.accuracy < last_accuracy):
@@ -592,7 +593,7 @@ Output size: %d
             last_accuracy = self.accuracy
             last_error = self.error
             
-    def _print_epoch_report(self, int num):
+    def _epoch_report(self, int num):
         """
         Reports the status of the network in the given training
         epoch, including error and accuracy.
@@ -677,7 +678,7 @@ Output size: %d
         # layer 4: output layer
         # dC / dW_4 = dC / df_4 f_3.T				(22)
         # (len, output_size).T (len, hidden_size) = (output_size, hidden_size)
-        cdef np.ndarray[DOUBLE_t, ndim=2] output_gradients
+        cdef np.ndarray[FLOAT_t, ndim=2] output_gradients
         output_gradients = self.net_gradients.T.dot(self.hidden_sent_values)
 
         # dC / db_4 = dC / df_4					(22)
@@ -701,7 +702,7 @@ Output size: %d
 
         # layer 2: linear layer
         # dC / dW_2 = dC / df_2 f_1.T				(22)
-        cdef np.ndarray[DOUBLE_t, ndim=2] hidden_gradients
+        cdef np.ndarray[FLOAT_t, ndim=2] hidden_gradients
         # (len, hidden_size).T (len, input_size) = (hidden_size, input_size)
         hidden_gradients = dCdf_2.T.dot(self.input_sent_values)
 
@@ -710,7 +711,7 @@ Output size: %d
         hidden_bias_gradients = dCdf_2.sum(0)
 
         # dC / df_1 = M_1.T dC / df_2
-        cdef np.ndarray[DOUBLE_t, ndim=2] input_gradients
+        cdef np.ndarray[FLOAT_t, ndim=2] input_gradients
         # (len, hidden_size) (hidden_size, input_size) = (len, input_size)
         input_gradients = dCdf_2.dot(self.hidden_weights)
 
@@ -729,7 +730,7 @@ Output size: %d
         # they are in the same sequence as the network receives them, i.e.
         # [token1-table1][token1-table2][token2-table1][token2-table2] (...)
         # input_size = num features * window (e.g. 60 * 5). Attardi
-        cdef np.ndarray[DOUBLE_t, ndim=2] input_deltas
+        cdef np.ndarray[FLOAT_t, ndim=2] input_deltas
         # (len, input_size)
         input_deltas = input_gradients * self.learning_rate_features
         
@@ -738,7 +739,7 @@ Output size: %d
                                           self.pos_padding))
         
         cdef np.ndarray[INT_t, ndim=1] features
-        cdef np.ndarray[DOUBLE_t, ndim=2] table
+        cdef np.ndarray[FLOAT_t, ndim=2] table
         cdef int start, end, t
         cdef int i
 
