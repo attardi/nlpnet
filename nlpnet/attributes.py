@@ -44,73 +44,44 @@ class Token(object):
     def __repr__(self):
         return self.word.__repr__()
     
-class Suffix(object):
-    """Dummy class for manipulating suffixes and their related codes."""
+class Affix(object):
+    """Dummy class for manipulating suffixes/affixes and their related codes."""
+    path = None                 # redefined in subclasses
+    # words smaller than the suffix size
+    #small_word = 0
+    padding = 0
+    other = 1                   # NOSUFFIX
+
+    @classmethod
+    def load(cls, md):
+        """
+        loads the listed suffixes/prefixes from the affix file.
+        """
+        cls.codes = {}
+        code = cls.other + 1
+        logger = logging.getLogger("Logger")
+        try:
+            with open(md.paths[cls.path], 'rb') as f:
+                for line in f:
+                    affix = unicode(line.strip(), 'utf-8')
+                    cls.codes[affix] = code
+                    code += 1
+            #cls.count_size = len(affix)
+        except IOError:
+            logger.warning('Affix list doesn\'t exist.')
+            raise
+        cls.num_suffixes = code
+
+class Suffix(Affix):
+    path = 'suffixes'
     codes = {}
     # words smaller than the suffix size
     #small_word = 0
     padding = 0
     other = 1                   # NOSUFFIX
-    num_suffixes = 2
     
     # Attardi: fixed setting (mimic SENNA)
-    suffix_size = 2
-
-    @classmethod
-    def load_suffixes(cls, md):
-        """
-        loads the listed suffixes from the suffix file.
-        """
-        Suffix.codes = {}
-        code = Suffix.other + 1
-        logger = logging.getLogger("Logger")
-        try:
-            with open(md.paths['suffixes'], 'rb') as f:
-                for line in f:
-                    suffix = unicode(line.strip(), 'utf-8')
-                    Suffix.codes[suffix] = code
-                    code += 1
-            #Suffix.suffix_size = len(suffix)
-        except IOError:
-            logger.warning('Suffix list doesn\'t exist.')
-            raise
-        Suffix.num_suffixes = code
-    
-    @classmethod
-    def load_prefixes(cls, md):
-        """
-        Loads prefixes from the prefix file.
-        """
-        cls.load_affixes(cls.prefix_codes, md.paths['prefixes'])
-        
-        # +1 because of the unkown prefix code
-        cls.num_prefixes_per_size = {size: len(cls.prefix_codes[size]) + 1
-                                     for size in cls.prefix_codes}
-    @classmethod
-    def load_affixes(cls, codes, filename):
-        """
-        Parent function for loading prefixes and suffixes.
-        """
-        logger = logging.getLogger("Logger")
-        
-        # intermediate storage
-        affixes_by_size = defaultdict(list)
-        
-        try:
-            with open(filename, 'rb') as f:
-                for line in f:
-                    affix = unicode(line.strip(), 'utf-8')
-                    size = len(affix)
-                    affixes_by_size[size].append(affix)
-        except IOError:
-            logger.error("File %s doesn't exist." % filename)
-            raise
-        
-        for size in affixes_by_size:
-            # for each size, each affix has a code starting from 1
-            # 0 is reserved for unknown affixes
-            codes[size] = {affix: code 
-                           for code, affix in enumerate(affixes_by_size[size], 1)}
+    count = 2
 
     @classmethod
     def create_suffix_list(cls, wordlist, num, size, min_occurrences):
@@ -131,12 +102,12 @@ class Suffix(object):
         common_endings = c.most_common(num)
         suffix_list = [e for e, n in common_endings if n >= min_occurrences]
         
-        with open(config.FILES['suffixes'], 'wb') as f:
+        with open(config.FILES[cls.path], 'wb') as f:
             for suffix in suffix_list:
                 f.write('%s\n' % suffix.encode('utf-8'))
 
     @classmethod
-    def get_suffix(cls, word):
+    def get(cls, word):
         """
         Returns the suffix code for the given word.
         """
@@ -146,16 +117,24 @@ class Suffix(object):
         if word == WD.padding_left or word == WD.padding_left:
             return Suffix.padding
 
-        suffix = word[-Suffix.suffix_size:]
+        suffix = word[-Suffix.count:]
 
         return Suffix.codes.get(suffix.lower(), Suffix.other)
 
     @classmethod
-    def get_suffixes(cls, words):
+    def get_all(cls, words):
         """
         :return: the list of suffix codes for the given words.
         """
-        return map(Suffix.get_suffix, words)
+        return map(cls.get, words)
+
+class Prefix(Affix):
+    path = 'prefixes'
+    codes = {}
+    num_affixes = 2
+    
+    # Attardi: fixed setting (mimic SENNA)
+    affix_size = 2
 
 class TokenConverter(object):
     

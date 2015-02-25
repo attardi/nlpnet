@@ -77,7 +77,8 @@ def create_reader(args, md):
     else:
         raise ValueError("Unknown task: %s" % args.task)
     
-    text_reader.get_dictionaries(args.dict_size)
+    dict_size = args.dict_size if getattr(args, 'dict_size', False) else None
+    text_reader.get_dictionaries(dict_size)
     return text_reader
     
 
@@ -134,7 +135,7 @@ def create_network(args, text_reader, feature_tables, md=None):
         layer_sizes = (nn.input_size, nn.hidden_size, 1)
     elif args.task == 'sslm':
         layer_sizes = (nn.input_size, nn.hidden_size, 2)
-    elif args.convolution > 0 and args.hidden > 0:
+    elif  args.task.startswith('srl') and  args.convolution > 0 and args.hidden > 0:
         layer_sizes = (nn.input_size, nn.hidden_size, nn.hidden2_size, nn.output_size)
     else:
         layer_sizes = (nn.input_size, nn.hidden_size, nn.output_size)
@@ -271,8 +272,8 @@ if __name__ == '__main__':
     logger.info("Feature vectors learning rate: %f" % nn.learning_rate_features)
     logger.info("Tag transition matrix learning rate: %f" % nn.learning_rate_trans)
     
-    nn.filename = config.FILES[md.network]
-    nn.saver = saver(nn.filename, md)
+    filename = config.FILES[md.network]
+    nn.saver = saver(filename, md)
 
     train(text_reader, args)
     

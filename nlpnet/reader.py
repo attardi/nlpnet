@@ -14,7 +14,7 @@ import attributes
 import metadata
 import config
 from word_dictionary import WordDictionary, NgramDictionary
-from attributes import get_capitalizations
+from attributes import get_capitalizations, Prefix, Suffix
 
 
 class TextReader(object):
@@ -193,33 +193,22 @@ class TextReader(object):
         def add_affix_extractors(affix):
             """
             Helper function that works for both suffixes and prefixes.
-            The parameter affix should be 'suffix' or 'prefix'.
+            :parame affix: either Suffix or Prefix.
             """
-            loader_function = getattr(attributes.Affix, 'load_%ses' % affix)
+            loader_function = getattr(affix, 'load')
             loader_function(self.md)
             
-            # deal with gaps between sizes (i.e., if there are sizes 2, 3, and 5)
-            codes = getattr(attributes.Affix, '%s_codes' % affix)
-            sizes = sorted(codes)
-            
-            getter = getattr(attributes.Affix, 'get_%s' % affix)
-            for size in sizes:
-                
-                # size=size because if we don't use it, lambda sticks to the last value of 
-                # the loop iterator size
-                def f(word, size=size):
-                    return getter(word, size)
-                
-                self.converter.add_extractor(f)
+            getter = getattr(affix, 'get_all')
+            self.converter.add_extractor(getter)
 
         self.converter = attributes.TokenConverter()
         self.converter.add_extractor(self.word_dict.get_indices)
         if self.md.use_caps:
             self.converter.add_extractor(get_capitalizations)
         if self.md.use_prefix:
-            add_affix_extractors('prefix')
+            add_affix_extractors(Prefix)
         if self.md.use_suffix:
-            add_affix_extractors('suffix')
+            add_affix_extractors(Suffix)
 
 
 class TaggerReader(TextReader):
@@ -233,7 +222,6 @@ class TaggerReader(TextReader):
         This class shouldn't be used directly. The constructor only
         provides method calls for subclasses.
         '''
-        self.task = None
         self._set_metadata(md)
         self.codified = False
 

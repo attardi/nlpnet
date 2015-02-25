@@ -78,11 +78,10 @@ class NerReader(TaggerReader):
         """
         self.rare_tag = None
         self.tag_dict = {}      # tag IDs
+        self.task = 'ner'
 
         # sets word_dict and tags_dict
         super(NerReader, self).__init__(md, load_dictionaries)
-        # FIXME: why after super?
-        self.task = 'ner'
 
         if sentences:
             self.sentences = sentences
@@ -103,14 +102,14 @@ class NerReader(TaggerReader):
                             self.sentences.append(sentence)
                             sentence = []
 
-    def create_converter(self, metadata):
+    def create_converter(self):
         """
         Sets up the token converter, which is responsible for transforming tokens into their
         feature vector indices
         """
-        super(NerReader, self).create_converter(metadata)
-        inGazetteer = gazetteer(config.FILES[metadata.gazetteer])
-        for c in metadata.gaz_classes:
+        super(NerReader, self).create_converter()
+        inGazetteer = gazetteer(self.md.paths[self.md.gazetteer])
+        for c in self.md.gaz_classes:
             if c in inGazetteer:
                 self.converter.add_extractor(inGazetteer[c])
             else:

@@ -168,6 +168,7 @@ Type %(prog)s [SUBTASK] -h to get subtask-specific help.'''
                             help='Use word lemmas instead of surface forms.')
     ner_parser.add_argument('--gazetteer', const=5, nargs='?', type=int, default=None,
                             help='Include gazetteer features. Optionally, supply the number of features (default 5)')
+    defaults['ner'] = dict(caps=5, suffix=5, gazetteer=5, dict_size=None)
 
     # LM argument parser
     lm_parser = subparsers.add_parser('lm', help='Language Model creation', 
