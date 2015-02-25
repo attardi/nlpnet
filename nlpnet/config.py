@@ -11,7 +11,7 @@ FILES = {}
 
 def get_config_paths(directory):
     """Sets the data directory containing the data for the models."""
-    assert os.path.isdir(directory), 'Invalid data directory'
+    assert os.path.isdir(directory), 'Invalid data directory: ' + directory
 
     dict = { key: os.path.join(directory, value) for key, value in [ 
         # cross-task data
@@ -44,6 +44,7 @@ def get_config_paths(directory):
         ('prefix_features_pos'         , 'pos-prefix-features.npy'),
 
         # NER
+        ('metadata_ner'		, 'ner-metadata.pickle'),
         ('network_ner'		, 'ner-network.npz'),
         ('ner_tag_dict'		, 'ner-tag-dict.pickle'),
         ('type_features_ner'	, 'ner-types-features.npy'),

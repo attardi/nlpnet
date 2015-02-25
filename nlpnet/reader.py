@@ -233,13 +233,13 @@ class TaggerReader(TextReader):
         This class shouldn't be used directly. The constructor only
         provides method calls for subclasses.
         '''
-        if load_dictionaries:
-            self.load_dictionary()
-            self.load_tag_dict()
-        
         self.task = None
         self._set_metadata(md)
         self.codified = False
+
+        if load_dictionaries:
+            self.load_dictionary()
+            self.load_tag_dict()
     
     def load_or_create_tag_dict(self):
         """

@@ -168,7 +168,7 @@ The tagger can then be trained as follows:
 
 .. code-block:: bash
 
-    bin/nlpnet-train.py --task ner --load_features --gazetteer \
+    bin/nlpnet-train.py ner --load_features --gazetteer \
          --data model --gold train+dev.iob -e 40 --variant senna \
          -l 0.0001 --lf 0.01 --lt 0.01 -w 5 -n 300 --caps --suffix -v
 

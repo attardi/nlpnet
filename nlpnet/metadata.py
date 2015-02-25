@@ -16,11 +16,11 @@ class Metadata(object):
     parameter files.
     """
     
-    def __init__(self, task, paths = None, use_caps=True, use_suffix=False,
+    def __init__(self, task, use_caps=True, use_suffix=False,
                  use_prefix=False, use_pos=False,
                  use_chunk=False, use_lemma=False, use_gazetteer=False):
         self.task = task
-        self.paths = paths if paths else config.FILES
+        self.paths = config.FILES
         self.use_caps = use_caps
         self.use_suffix = use_suffix
         self.use_prefix = use_prefix
@@ -31,7 +31,7 @@ class Metadata(object):
         self.metadata = 'metadata_%s' % task
         self.network = 'network_%s' % task
         
-        if task != 'lm' and  task != 'sslm':
+        if task != 'lm' and task != 'sslm':
             self.tag_dict = '%s_tag_dict' % task
         else:
             self.tag_dict = None

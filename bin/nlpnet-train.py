@@ -13,8 +13,10 @@ import numpy as np
 # Attardi: allow executing from anywhere without installing the package
 import sys
 import os
-srcdir = os.path.dirname(os.path.realpath(__file__)) + '/../'
-sys.path.append(srcdir + 'build/lib.linux-x86_64-2.7')
+import distutils.util
+builddir = os.path.dirname(os.path.realpath(__file__)) + '/../build/lib.'
+libdir = builddir + distutils.util.get_platform() + '-' + '.'.join(map(str, sys.version_info[:2]))
+sys.path.append(libdir)
 
 import nlpnet.config as config
 import nlpnet.read_data as read_data

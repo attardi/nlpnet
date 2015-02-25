@@ -162,6 +162,8 @@ Type %(prog)s [SUBTASK] -h to get subtask-specific help.'''
                                        parents=[base_parser])
     ner_parser.add_argument('--caps', const=5, nargs='?', type=int, default=None,
                              help='Include capitalization features. Optionally, supply the number of features (default 5)')
+    ner_parser.add_argument('--suffix', const=5, nargs='?', type=int, default=None,
+                            help='Include suffix features. Optionally, supply the number of features (default 5)')
     ner_parser.add_argument('--use_lemma', action='store_true', dest='use_lemma',
                             help='Use word lemmas instead of surface forms.')
     ner_parser.add_argument('--gazetteer', const=5, nargs='?', type=int, default=None,

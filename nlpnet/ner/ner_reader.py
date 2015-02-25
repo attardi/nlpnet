@@ -70,7 +70,7 @@ class NerReader(TaggerReader):
     readable by the neural network for the NER tagging task.
     """
     
-    def __init__(self, sentences=None, filename=None, load_dictionaries=True):
+    def __init__(self, md=None, sentences=None, filename=None, load_dictionaries=True, variant=None):
         """
         :param sentences: a sequence of tagged sentences. Each sentence must be a 
             sequence of (token, tag) tuples. If None, the sentences are read from the 
@@ -80,7 +80,7 @@ class NerReader(TaggerReader):
         self.tag_dict = {}      # tag IDs
 
         # sets word_dict and tags_dict
-        super(TaggerReader, self).__init__(load_dictionaries)
+        super(NerReader, self).__init__(md, load_dictionaries)
         # FIXME: why after super?
         self.task = 'ner'
 
