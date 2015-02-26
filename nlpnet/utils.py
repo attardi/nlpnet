@@ -229,11 +229,11 @@ def load_features(args, md, text_reader):
     #np.set_printoptions(threshold='nan') # debug
     np.random.seed(1) # debug (for replicability)
     if not args.load_types:
-        logger.info("Generating word type features...")
+        logger.info("Generating word vectors...")
         table_size = len(text_reader.word_dict)
         types_table = generate_feature_vectors(table_size, args.num_features)
     else:
-        logger.info("Loading word type features...")
+        logger.info("Loading word vectors...")
         types_table = load_features_from_file(config.FILES[md.type_features])
         
         if len(types_table) < len(text_reader.word_dict):

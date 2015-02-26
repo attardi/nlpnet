@@ -28,8 +28,8 @@ class Metadata(object):
         self.use_chunk = use_chunk
         self.use_lemma = use_lemma
         self.use_gazetteer = use_gazetteer
-        self.metadata = 'metadata_%s' % task
-        self.network = 'network_%s' % task
+        self.metadata = '%s_metadata' % task
+        self.network = '%s_network' % task
         
         if task != 'lm' and task != 'sslm':
             self.tag_dict = '%s_tag_dict' % task
@@ -37,46 +37,46 @@ class Metadata(object):
             self.tag_dict = None
         
         if task == 'srl_boundary':
-            self.pred_dist_table = 'pred_dist_table_boundary'
-            self.target_dist_table = 'target_dist_table_boundary'
-            self.transitions = 'srl_transitions_boundary'
-            self.type_features = 'type_features_boundary'
-            self.caps_features = 'caps_features_boundary'
-            self.pos_features = 'pos_features_boundary'
-            self.chunk_features = 'chunk_features_boundary'
+            self.pred_dist_table = 'srl_boundary_pred_dist_table'
+            self.target_dist_table = 'srl_boundary_target_dist_table'
+            self.transitions = 'srl_boundary_srl_transitions'
+            self.type_features = 'srl_boundary_type_features'
+            self.caps_features = 'srl_boundary_caps_features'
+            self.pos_features = 'srl_boundary_pos_features'
+            self.chunk_features = 'srl_boundary_chunk_features'
             self.suffix_features = None
             
         elif task == 'srl_classify':
-            self.pred_dist_table = 'pred_dist_table_classify'
-            self.target_dist_table = 'target_dist_table_classify'
+            self.pred_dist_table = 'pred_dist_table'
+            self.target_dist_table = 'srl_classify_target_dist_table'
             self.transitions = None
-            self.type_features = 'type_features_classify'
-            self.caps_features = 'caps_features_classify'
-            self.pos_features = 'pos_features_classify'
-            self.chunk_features = 'chunk_features_classify'
+            self.type_features = 'srl_classify_type_features'
+            self.caps_features = 'srl_classify_caps_features'
+            self.pos_features = 'srl_classify_pos_features'
+            self.chunk_features = 'srl_classify_chunk_features'
             self.suffix_features = None
         
         elif task == 'srl':
             # one step srl
-            self.pred_dist_table = 'pred_dist_table_1step'
-            self.target_dist_table = 'target_dist_table_1step'
-            self.transitions = 'srl_transitions_1step'
-            self.type_features = 'type_features_1step'
-            self.caps_features = 'caps_features_1step'
-            self.pos_features = 'pos_features_1step'
-            self.chunk_features = 'chunk_features_1step'
+            self.pred_dist_table = 'srl_1step_pred_dist_table'
+            self.target_dist_table = 'srl_1step_target_dist_table'
+            self.transitions = 'srl_1step_srl_transitions'
+            self.type_features = 'srl_1step_type_features'
+            self.caps_features = 'srl_1step_caps_features'
+            self.pos_features = 'srl_1step_pos_features'
+            self.chunk_features = 'srl_1step_chunk_features'
             self.suffix_features = None
         
         else:
-            self.type_features = 'type_features_%s' % task
-            self.caps_features = 'caps_features_%s' % task
-            self.pos_features = 'pos_features_%s' % task
-            self.chunk_features = 'chunk_features_%s' % task
-            self.suffix_features = 'suffix_features_%s' % task
+            self.type_features = '%s_type_features' % task
+            self.caps_features = '%s_caps_features' % task
+            self.pos_features = '%s_pos_features' % task
+            self.chunk_features = '%s_chunk_features' % task
+            self.suffix_features = '%s_suffix_features' % task
 
         if task == 'ner':
-            self.gazetteer = 'gazetteer_ner' # gazetteer file
-            self.gaz_features = 'gaz_features_ner'
+            self.gazetteer = 'ner_gazetteer' # gazetteer file
+            self.gaz_features = 'ner_gaz_features'
             self.gaz_classes = ['LOC', 'MISC', 'ORG', 'PER']
     
     def __str__(self):

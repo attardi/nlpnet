@@ -55,10 +55,12 @@ def create_reader(args, md):
     elif args.task == 'lm':
         text_reader = reader.TextReader(md, filename=args.gold,
                                         variant=args.variant)
+        text_reader.get_dictionaries(args.dict_size_size)
 
     elif args.task == 'sslm':
         text_reader = reader.TweetReader(md, filename=args.gold,
                                          ngrams=args.ngrams, variant=args.variant)
+        text_reader.get_dictionaries(args.dict_size_size)
 
     elif args.task.startswith('srl'):
         text_reader = srl.srl_reader.SRLReader(md, filename=args.gold, only_boundaries=args.identify, 
@@ -77,8 +79,6 @@ def create_reader(args, md):
     else:
         raise ValueError("Unknown task: %s" % args.task)
     
-    dict_size = args.dict_size if getattr(args, 'dict_size', False) else None
-    text_reader.get_dictionaries(dict_size)
     return text_reader
     
 

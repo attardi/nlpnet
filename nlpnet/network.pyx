@@ -14,7 +14,6 @@ from cpython cimport bool
 from itertools import izip
 import logging
 
-from numpy import float as FLOAT
 ctypedef np.float_t FLOAT_t
 ctypedef np.int_t INT_t
 ctypedef np.double_t DOUBLE_t
@@ -22,7 +21,7 @@ ctypedef np.double_t DOUBLE_t
 # ----------------------------------------------------------------------
 # Math functions
 
-cdef softmax(np.ndarray[FLOAT_t] a, axis=0):
+cdef softmax(np.ndarray a, axis=0):
     """Compute the ratio of exp(a) to the sum of exponentials along the axis.
 
     Parameters
@@ -41,7 +40,7 @@ cdef softmax(np.ndarray[FLOAT_t] a, axis=0):
     e = np.exp(a - a_max)
     return e / np.sum(e, axis)
 
-cdef logsumexp(np.ndarray[FLOAT_t] a, axis=None):
+cdef logsumexp(np.ndarray a, axis=None):
     """Compute the log of the sum of exponentials of input elements.
     like: scipy.misc.logsumexp
 
@@ -68,7 +67,7 @@ cdef logsumexp(np.ndarray[FLOAT_t] a, axis=None):
 
 cdef hardtanh(np.ndarray[FLOAT_t, ndim=1] weights):
     """Hard hyperbolic tangent."""
-    cdef np.ndarray[FLOAT_t] out = np.empty_like(weights)
+    cdef np.ndarray out = np.empty_like(weights)
     cdef int i
     cdef double w
     for i, w in enumerate(weights):
@@ -80,9 +79,9 @@ cdef hardtanh(np.ndarray[FLOAT_t, ndim=1] weights):
             out[i] = w
     return out
 
-cdef hardtanhd(np.ndarray[FLOAT_t] weights):
+cdef hardtanhd(np.ndarray[FLOAT_t, ndim=2] weights):
     """derivative of hardtanh"""
-    cdef np.ndarray[FLOAT_t] out = np.zeros_like(weights)
+    cdef np.ndarray out = np.zeros_like(weights)
     cdef int i
     cdef double w
     for i, w in enumerate(weights.flat):
@@ -225,7 +224,7 @@ Output size: %d
         
         return desc
     
-    def lookup(self, np.ndarray[INT_t, ndim=2] indices):
+    def lookup(self, np.ndarray indices):
         """Find the actual input values concatenating the feature vectors
         for each input token.
         :param indices: a 2-dim np array of indices into the feature tables.
@@ -813,4 +812,3 @@ Output size: %d
 include "networkconv.pyx"
 include "networklm.pyx"
 include "networkSent.pyx"
-

@@ -16,7 +16,6 @@ import config
 from word_dictionary import WordDictionary, NgramDictionary
 from attributes import get_capitalizations, Prefix, Suffix
 
-
 class TextReader(object):
     
     def __init__(self, md=None, sentences=None, filename=None, variant=None):
@@ -49,8 +48,8 @@ class TextReader(object):
 
     def add_text(self, text):
         """
-        Adds more text to the reader. The text must be a sequence of sequences of 
-        tokens.
+        Adds more text to the reader. The text must be a sequence of
+        sequences of tokens.
         """
         self.sentences.extend(text)
     
@@ -80,7 +79,7 @@ class TextReader(object):
         logger = logging.getLogger("Logger")
         logger.info("Loading vocabulary")
         filename = self.md.paths['vocabulary']
-        
+
         words = []
         with open(filename, 'rb') as f:
             for word in f:
@@ -226,8 +225,7 @@ class TaggerReader(TextReader):
         self.codified = False
 
         if load_dictionaries:
-            self.load_dictionary()
-            self.load_tag_dict()
+            self.get_dictionaries()
     
     def load_or_create_tag_dict(self):
         """
@@ -320,9 +318,9 @@ class TaggerReader(TextReader):
             filename = self.md.paths[key]
 
         ordered_keys = sorted(tag_dict, key=tag_dict.get)
-        text = '\n'.join(ordered_keys)
         with open(filename, 'wb') as f:
-            f.write(text.encode('utf-8'))
+            for tag in ordered_keys:
+                print >> f, tag.encode('utf-8')
     
     def load_tag_dict(self, filename=None):
         """

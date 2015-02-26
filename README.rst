@@ -147,7 +147,7 @@ the embeddings from SENNA can be adapted for use with ``nlpnet`` with the comman
 
 .. code-block:: bash
 
-    bin/embeddingsAdapter.py -s senna/embeddings/english.tsv model/types-features-ner.npy model/word-dict.pickle
+    bin/nlpnet-load-embeddings.py --task ner senna senna/embeddings/embeddings.txt -v senna/hash/words.lst -o model
 
 The gazetters from SENNA can be used to produce a single entity list as follows:
 

@@ -72,22 +72,18 @@ class NerReader(TaggerReader):
     
     def __init__(self, md=None, sentences=None, filename=None, load_dictionaries=True, variant=None):
         """
-        :param sentences: a sequence of tagged sentences. Each sentence must be a 
-            sequence of (token, tag) tuples. If None, the sentences are read from the 
-            default location.
+        :param sentences: a sequence of tagged sentences. Each sentence must
+            be a sequence of (token, tag) tuples. If None, the sentences are
+            read from the default location.
         """
         self.rare_tag = None
         self.tag_dict = {}      # tag IDs
         self.task = 'ner'
 
-        # sets word_dict and tags_dict
-        super(NerReader, self).__init__(md, load_dictionaries)
-
         if sentences:
             self.sentences = sentences
         else:
             self.sentences = []
-           
             if filename:
                 with open(filename, 'rb') as f:
                     sentence = []
@@ -95,12 +91,15 @@ class NerReader(TaggerReader):
                         line = line.strip()
 
                         if line:
-                            (form, pos, iob) = unicode(line, 'utf-8').split()
+                            form, pos, iob = unicode(line, 'utf-8').split()
                             sentence.append([form, iob])
                         else:
                             sentence = toIOBES(sentence)
                             self.sentences.append(sentence)
                             sentence = []
+
+        # sets word_dict and tags_dict
+        super(NerReader, self).__init__(md, load_dictionaries)
 
     def create_converter(self):
         """

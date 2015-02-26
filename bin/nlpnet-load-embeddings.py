@@ -3,8 +3,7 @@
 
 """
 Script to load word embeddings from different representations
-and save them in the nlpnet format (numpy arrays and a text
-vocabulary).
+and save them in the nlpnet format (numpy arrays and a text vocabulary).
 """
 
 import argparse
@@ -12,7 +11,10 @@ import os
 import logging
 import numpy as np
 
-import nlpnet
+import sys, os
+sys.path.append(os.path.dirname(os.path.realpath(__file__)) + '/..')
+
+import nlpnet.config, nlpnet.word_dictionary, nlpnet.utils
 
 
 def read_plain_embeddings(filename):
@@ -156,16 +158,16 @@ This script can deal with the following formats:
     parser.add_argument('--task', help='Task for which the embeddings will be used. '\
                         'It determines the name of the embeddings file. If not given, '\
                         'it will be nlpnet-embeddings.npy.', dest='task', default=None, 
-                        choices=['pos', 'srl', 'srl_boundary',
+                        choices=['pos', 'ner', 'srl', 'srl_boundary',
                                  'srl_classify', 'srl_predicates'])
     args = parser.parse_args()
     
-    nlpnet.set_data_dir(args.output_dir)
+    nlpnet.config.set_data_dir(args.output_dir)
     output_vocabulary = nlpnet.config.FILES['vocabulary']
     if args.task is None:
         output_embeddings = os.path.join(args.output_dir, 'nlpnet-embeddings.npy')
     else:
-        key = 'type_features_%s' % args.task
+        key = '%s_type_features' % args.task
         output_embeddings = nlpnet.config.FILES[key]
     
     nlpnet.utils.set_logger(logging.INFO)

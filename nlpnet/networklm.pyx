@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+from numpy import float as FLOAT
+
 import utils
 
 # batch size for traing the LanguageModel

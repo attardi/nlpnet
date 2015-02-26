@@ -19,7 +19,7 @@ from ..reader import TaggerReader
 
 class SRLReader(TaggerReader):
     
-    def __init__(self, filename=None, only_boundaries=False, 
+    def __init__(self, md, filename=None, only_boundaries=False, 
                  only_classify=False, only_predicates=False,
                  load_dictionaries=True):
         """
@@ -44,7 +44,7 @@ class SRLReader(TaggerReader):
             self.task = 'srl'
         self.rare_tag = 'O'
         
-        super(SRLReader, self).__init__(load_dictionaries)
+        super(SRLReader, self).__init__(md, load_dictionaries)
         
         if filename is not None:
         
