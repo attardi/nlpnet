@@ -105,7 +105,7 @@ def get_args():
                             'supply the number of features (default 2)')
     pos_parser.add_argument('--prefix_size', type=int, default=5,
                             help='Use prefixes up to this size (in characters, default 5). '\
-                            'Only used if --suffix is supplied')
+                            'Only used if --prefix is supplied')
     defaults['pos'] = dict(window=5, hidden=100, iterations=15, 
                            learning_rate=0.001, learning_rate_features=0.001,
                            learning_rate_transitions=0.001)

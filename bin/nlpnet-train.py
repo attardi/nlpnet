@@ -152,34 +152,21 @@ def save_features(nn, md):
     :param nn: the neural network
     :param md: a Metadata object describing the network
     """
-    def save_affix_features(affix, iter_tables):
-        """
-        Helper function for both suffixes and affixes.
-        affix should be either 'suffix' or 'affix'
-        """
-        # there can be an arbitrary number of tables, one for each length
-        affix_features = []
-        codes = getattr(attributes.Affix, '%s_codes' % affix)
-        num_sizes = len(codes)
-        for _ in range(num_sizes):
-            affix_features.append(iter_tables.next())
-        
-        filename_key = getattr(md, '%s_features' % affix)
-        filename = config.FILES[filename_key]
-        utils.save_features_to_file(affix_features, filename)
-
     iter_tables = iter(nn.feature_tables)
-    # type features
+    # word features
     utils.save_features_to_file(iter_tables.next(), config.FILES[md.type_features])
     
     # other features - the order is important!
-    if md.use_caps: utils.save_features_to_file(iter_tables.next(), config.FILES[md.caps_features])
-    if md.use_prefix:
-        save_affix_features('prefix', iter_tables)
+    if md.use_caps:
+        utils.save_features_to_file(iter_tables.next(), config.FILES[md.caps_features])
     if md.use_suffix:
-        save_affix_features('suffix', iter_tables)
-    if md.use_pos: utils.save_features_to_file(iter_tables.next(), config.FILES[md.pos_features])
-    if md.use_chunk: utils.save_features_to_file(iter_tables.next(), config.FILES[md.chunk_features])
+        utils.save_features_to_file(iter_tables.next(), config.FILES[md.suffix_features])
+    if md.use_prefix:
+        utils.save_features_to_file(iter_tables.next(), config.FILES[md.prefix_features])
+    if md.use_pos:
+        utils.save_features_to_file(iter_tables.next(), config.FILES[md.pos_features])
+    if md.use_chunk:
+        utils.save_features_to_file(iter_tables.next(), config.FILES[md.chunk_features])
 
     # NER gazetteer features
     if md.use_gazetteer:
@@ -280,6 +267,6 @@ if __name__ == '__main__':
     logger.info("Saving trained models...")
     save_features(nn, md)
     
-    nn.save(nn.filename)
+    nn.save(filename)
     logger.info("Saved network to %s" % nn_file)
     

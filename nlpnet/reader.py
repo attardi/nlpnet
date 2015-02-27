@@ -155,9 +155,9 @@ class TextReader(object):
             suffixes_all_lengths.extend(suffixes_this_length)
         
         logger.info('Created a list of %d sufixes.' % len(suffixes_all_lengths))
-        text = '\n'.join(suffixes_all_lengths)
         with open(self.md.paths['suffixes'], 'wb') as f:
-            f.write(text.encode('utf-8'))
+            for text in suffixes_all_lengths:
+                f.write(text.encode('utf-8')+'\n')
     
     def create_prefix_list(self, max_size, min_occurrences):
         """
@@ -320,7 +320,7 @@ class TaggerReader(TextReader):
         ordered_keys = sorted(tag_dict, key=tag_dict.get)
         with open(filename, 'wb') as f:
             for tag in ordered_keys:
-                print >> f, tag.encode('utf-8')
+                f.write(tag.encode('utf-8')+'\n')
     
     def load_tag_dict(self, filename=None):
         """
