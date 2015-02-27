@@ -268,5 +268,5 @@ if __name__ == '__main__':
     save_features(nn, md)
     
     nn.save(filename)
-    logger.info("Saved network to %s" % nn_file)
+    logger.info("Saved network to %s" % filename)
     
