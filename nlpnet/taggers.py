@@ -81,7 +81,7 @@ def create_reader(md, gold_file=None, tagging=False):
 
     elif md.task == 'ner':
         if tagging:
-            tr = NerTagReader()
+            tr = NerTagReader(md)
         else:
             print 'loading dict'
             tr = NerReader(filename=gold_file)
@@ -95,7 +95,7 @@ def create_reader(md, gold_file=None, tagging=False):
     else:
         raise ValueError("Unknown task: %s" % md.task)
     
-    tr.create_converter(md)
+    tr.create_converter()
     
     logger.info('Done')
     return tr
@@ -176,7 +176,7 @@ If you don't have the trained models, download them from http://nilc.icmc.usp.br
         assert config.data_dir is not None, asrt_msg
         
         self._load_data()
-        
+
     def _load_data(self):
         """Implemented by subclasses"""
         pass

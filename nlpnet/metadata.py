@@ -106,11 +106,11 @@ class Metadata(object):
         """
         if paths is None:
             paths = config.FILES
-        md = Metadata(None, paths)
+        md = Metadata(task, paths)
 
-        # the actual content of the file is the __dict__ member variable, which contain all
-        # the instance's data
-        filename = paths[self.metadata]
+        # the actual content of the file is the __dict__ member variable,
+        # which contain all the instance's data
+        filename = paths[md.metadata]
         with open(filename, 'rb') as f:
             data = cPickle.load(f)
         md.__dict__.update(data)

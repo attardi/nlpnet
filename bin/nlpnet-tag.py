@@ -18,7 +18,9 @@ srcdir = os.path.dirname(os.path.realpath(__file__)) + '/../'
 sys.path.append(srcdir + 'build/lib.linux-x86_64-2.7')
 
 import nlpnet
+import nlpnet.taggers
 import nlpnet.utils as utils
+import nlpnet.config as config
 
 def interactive_running(task):
     """
@@ -131,7 +133,7 @@ if __name__ == '__main__':
     logging_level = logging.DEBUG if args.verbose else logging.WARNING
     utils.set_logger(logging_level)
     logger = logging.getLogger("Logger")
-    nlpnet.set_data_dir(args.data)
+    config.set_data_dir(args.data)
     
     #interactive_running(args.task)
     process_input(args.task)

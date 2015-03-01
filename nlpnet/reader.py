@@ -186,8 +186,8 @@ class TextReader(object):
     
     def create_converter(self):
         """
-        Sets up the token converter, which is responsible for transforming tokens into their
-        feature vector indices
+        Sets up the token converter, which is responsible for transforming
+        tokens into their feature vector indices.
         """
         def add_affix_extractors(affix):
             """

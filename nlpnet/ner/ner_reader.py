@@ -120,11 +120,12 @@ class NerTagReader(NerReader):
     readable by the neural network for the NER tagging task.
     """
     
-    def __init__(self):
+    def __init__(self, md=None):
         """
         Read sentences from stdin.
         """
         self.task = 'ner'
+        self._set_metadata(md)
         # loads word_dict and tags_dict
         self.load_dictionary()
         self.load_tag_dict()
