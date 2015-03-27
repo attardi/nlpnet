@@ -320,7 +320,11 @@ Output size: %d
                 self.input_sent_values[i] = input_values
                 self.layer2_sent_values[i] = self.layer2_values
                 self.hidden_sent_values[i] = self.hidden_values
-        
+                # DEBUG
+                # print 'input', input_values[:4]
+                # print 'hidden', self.hidden_values[:4]
+                # print 'output', scores[i][:4]
+
         if train:
             if self._calculate_gradients_sll(tags, scores):
 #            if self._calculate_gradients_wll(tags, scores):

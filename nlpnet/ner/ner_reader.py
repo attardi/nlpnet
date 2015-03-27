@@ -79,6 +79,7 @@ class NerReader(TaggerReader):
         self.rare_tag = None
         self.tag_dict = {}      # tag IDs
         self.task = 'ner'
+        self.variant = variant
 
         if sentences:
             self.sentences = sentences

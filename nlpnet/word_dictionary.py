@@ -63,12 +63,8 @@ class WordDictionary(dict):
         else:
             # using ordered dict as an ordered set
             # (we need to keep the order and to eliminate duplicates)
-            if variant == 'polyglot':
-                words = [word for word in wordlist]
-            else:
-                words = [word.lower() for word in wordlist]
-            values = [None] * len(words)
-            words = OD(zip(words, values)).keys()
+            values = [None] * len(wordlist)
+            words = OD(zip(wordlist, values)).keys()
             
         # trim to the maximum size
         if size is None:

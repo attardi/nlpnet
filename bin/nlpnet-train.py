@@ -218,7 +218,7 @@ if __name__ == '__main__':
     args = arguments.get_args()
 
     # set the seed for replicability
-    #np.random.seed(42)
+    np.random.seed(42)
 
     logging_level = logging.DEBUG if args.verbose else logging.INFO
     utils.set_logger(logging_level)

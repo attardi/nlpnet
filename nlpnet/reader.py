@@ -65,11 +65,10 @@ class TextReader(object):
         """
         if os.path.isfile(self.md.paths['vocabulary']):
             self.load_dictionary()
-            return
-        
-        self.generate_dictionary(dict_size, minimum_occurrences=2)
-        self.save_dictionary()
-    
+        else:        
+            self.generate_dictionary(dict_size, minimum_occurrences=2)
+            self.save_dictionary()
+
     def load_or_create_tag_dict(self):
         """No tag dictioinary"""
         return
