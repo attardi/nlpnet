@@ -2,6 +2,9 @@
 ``nlpnet`` --- Natural Language Processing with neural networks
 ===============================================================
 
+This is an obsolete version of the toolkit.
+A fully redesigned version is available as ``DeepNL`` at https://github.com/attardi/deepnl
+
 ``nlpnet`` is a Python library for Natural Language Processing tasks based on neural networks. 
 
 It performs part-of-speech tagging, Named Entity tagging and semantic role
